@@ -33,7 +33,7 @@ class wallet:
 	def balance():
 		return
 
-wall=wallet()
+#wall=wallet()
 #print(binascii.b2a_hex(wall.public_key).decode('utf-8'))
 #print(binascii.b2a_hex(wall.public_key).decode('ascii'))
 #print(binascii.b2a_hex(wall.private_key))

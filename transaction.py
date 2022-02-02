@@ -68,15 +68,7 @@ class Transaction:
         hashed_transaction=SHA.new(transaction_to_sign.encode('utf-8'))      # hash message (transaction)
         signature=PKCS1_v1_5.new(key).sign(hashed_transaction)               # sign using private key
         self.signature=binascii.b2a_hex(signature).decode('utf-8')           # save signature in utf-8 form
-
-        """    verification process: will not be part of this function
-        key=RSA.importKey(wall.public_key)
-        try:
-            PKCS1_v1_5.new(key).verify(hashed_transaction,self.signature)
-            print("success")
-        except:
-            print("fail")   
-        """     
+   
        
 
 #wall=wallet()      
