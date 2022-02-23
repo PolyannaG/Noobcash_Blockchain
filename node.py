@@ -1,7 +1,7 @@
 from ast import excepthandler
-from block import block
+from block import Block
 from wallet import wallet
-from transaction import transaction
+from transaction import Transaction, transaction
 
 import Crypto
 import Crypto.Random
@@ -27,8 +27,9 @@ class node:
 
 
 
-	def create_new_block():
-		return
+	def create_new_block(index,previousHash,nonce):
+		new_block=Block(index,previousHash,nonce)
+		return new_block
 
 	def create_wallet(self):
 		#create a wallet for this node, with a public key and a private key
@@ -40,8 +41,9 @@ class node:
 		return
 
 
-	def create_transaction(sender, receiver, signature):
+	def create_transaction(self,sender, receiver, signature,amount):
 		#remember to broadcast it
+		
 		return
 
 
