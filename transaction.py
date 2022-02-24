@@ -50,10 +50,10 @@ class Transaction:
         """
         Convert transaction info to dictionary
         """
-        transaction_dict=({'sender_address' : self.sender_address, 
-                            'receiver_address' : self.receiver_address,
+        transaction_dict=({'sender_address' : str(self.sender_address), 
+                            'receiver_address' : str(self.receiver_address),
                             'amount' : self.amount,
-                            'transaction_id' : self.transacton_id,
+                            'transaction_id' : str(self.transacton_id),
                             'transaction_inputs' : self.transaction_inputs,
                             'transaction_outputs' : self.transaction_outputs})
         return transaction_dict

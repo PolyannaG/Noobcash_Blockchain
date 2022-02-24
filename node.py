@@ -1,7 +1,7 @@
 from ast import excepthandler
 from block import Block
 from wallet import wallet
-from transaction import Transaction, transaction
+from transaction import Transaction
 
 import Crypto
 import Crypto.Random
@@ -9,31 +9,34 @@ from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
-class node:
+class Node:
 	def __init__(self):
-		self.NBC=100;
+		#self.NBC=100;
 		##set
 
 		#self.chain
 		#self.current_id_count
 		#self.NBCs
+		self.id=None	# node id in ring
 		self.NBCs=[]    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
 						# https://academy.binance.com/en/glossary/unspent-transaction-output-utxo
 		#self.wallet
-		self.wallet=None  # wallet will be created by create_wallet() --> should we call it here??
+		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??
 
 		#slef.ring[]   #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+		print("creating new node instance")
 
 
 
-
-	def create_new_block(index,previousHash,nonce):
+	def create_new_block(self,index,previousHash,nonce):
+		print("creating new block")
 		new_block=Block(index,previousHash,nonce)
 		return new_block
 
 	def create_wallet(self):
 		#create a wallet for this node, with a public key and a private key
-		self.wallet=wallet.wallet()
+		return wallet()
+		
 
 	def register_node_to_ring():
 		#add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
@@ -41,10 +44,13 @@ class node:
 		return
 
 
-	def create_transaction(self,sender, receiver, signature,amount):
+	def create_transaction(self,sender, receiver,amount, signature=None):
 		#remember to broadcast it
 		
-		return
+		#logic missing! inputs, outputs, broadcast etx, only for testing
+		new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
+		new_transaction.sign_transaction()
+		return new_transaction
 
 
 	def broadcast_transaction():
@@ -73,15 +79,15 @@ class node:
 
 
 	def mine_block():
-
+		return
 
 
 	def broadcast_block():
-
+		return
 
 		
 
-	def valid_proof(.., difficulty=MINING_DIFFICULTY):
+	#def valid_proof(.., difficulty=MINING_DIFFICULTY):
 
 
 
@@ -90,10 +96,10 @@ class node:
 
 	def valid_chain(self, chain):
 		#check for the longer chain accroose all nodes
-
+		return
 
 	def resolve_conflicts(self):
 		#resolve correct chain
-
+		return
 
 

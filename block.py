@@ -1,5 +1,4 @@
 
-import blockchain
 from Crypto.Hash import SHA
 import time
 
@@ -36,7 +35,7 @@ class Block:
 		
 
 
-	def add_transaction(self, transaction, blockchain):
-		#add a transaction to the block
-		self.listofTransactions.append(transaction)
+	# def add_transaction(self, transaction, blockchain):
+	# 	#add a transaction to the block
+	# 	self.listofTransactions.append(transaction)
 		
