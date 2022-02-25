@@ -15,7 +15,7 @@ class Node:
 		##set
 
 		#self.chain
-		#self.current_id_count
+		self.current_id_count=0
 		#self.NBCs
 		self.id=None	# node id in ring
 		self.NBCs=[]    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
@@ -24,6 +24,7 @@ class Node:
 		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??
 
 		#slef.ring[]   #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+		self.ring=[]
 		print("creating new node instance")
 
 
@@ -38,10 +39,18 @@ class Node:
 		return wallet()
 		
 
-	def register_node_to_ring():
+	def register_node_to_ring(self,public_key,address):
 		#add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
 		#bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
-		return
+		try: 
+			node_info=[{'node_id': self.current_id_count+1, 'address': address, 'public_key': public_key, 'balance': 0}]  # 100 NBC to be given later with transaction???
+			self.current_id_count+=1
+			self.ring.append(node_info)
+
+			# logic missing!!!! -> give money through transaction, if we have n nodes, broadcast
+			return True
+		except:
+			return False
 
 
 	def create_transaction(self,sender, receiver,amount, signature=None):
