@@ -20,6 +20,8 @@ class Node:
 		self.id=None	# node id in ring
 		self.NBCs=[]    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
 						# https://academy.binance.com/en/glossary/unspent-transaction-output-utxo
+						# dictionary: NBCs(i) will be a set that holds transaction outputs (transactions from which the
+						# node has received money): list of tuples where first item is the transaction id and the second item is the amount the node gained
 		#self.wallet
 		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??
 
@@ -43,7 +45,7 @@ class Node:
 		#add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
 		#bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
 		try: 
-			node_info=[{'node_id': self.current_id_count+1, 'address': address, 'public_key': public_key, 'balance': 0}]  # 100 NBC to be given later with transaction???
+			node_info={'node_id': self.current_id_count+1, 'address': address, 'public_key': public_key, 'balance': 0}  # 100 NBC to be given later with transaction???
 			self.current_id_count+=1
 			self.ring.append(node_info)
 
@@ -57,12 +59,51 @@ class Node:
 		#remember to broadcast it
 		
 		#logic missing! inputs, outputs, broadcast etx, only for testing
-		new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
-		new_transaction.sign_transaction()
+		if (sender=='0'):																			  # transaction for genesis block	
+			new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
+			new_transaction.transaction_inputs=[]
+			new_transaction.transaction_outputs=[(receiver,amount)]
+			new_transaction.sign_transaction()
+		else:                           															  # usual case
+			for node_item in self.ring:																  # check that node is indeed part of the ring
+				if (node_item['address']==sender):
+					sender_id=node_item['node_id']
+			if sender_id==None:						
+				return "Sender not part of ring." ,400
+			elif sender_id!=self.id:																  # check that the node is indeed the current one (for safety, should always be true)
+				return "Sender not current node, you do not own this wallet.", 400
+			else:
+				total=self.wallet.balance(self.NBCs(sender_id))										  # check that the node has enough NBCs for the transaction	
+				if (total<amount):
+					return "Not enough NBCs for the spesified transaction.", 400
+				else:                                                                                 # all checks complete, we are ready to start the transaction
+					try:
+						inputs=[]
+						outputs=[]																		
+						cur_sum=0
+						for item in self.NBCs(sender_id):											  # find the previous transactions the money will come from
+							cur_sum+=item[1]
+							inputs.append(item)
+							if cur_sum>=amount:
+								break
+						difference=cur_sum-amount													  # calculate how much money the sender has to get back				
+						if (difference!=0):
+							outputs.append((sender,difference))
+						outputs.append((receiver,amount))                                             # the money to be given to receiver
+						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
+						new_transaction.transaction_inputs=inputs                                     # add the trasaction inputs
+						new_transaction.transaction_outputs=outputs          		              	  # add the transaction outputs		
+						new_transaction.sign_transaction()											  # sign transaction		
+						self.broadcast_transaction(new_transaction)                                   # broadcast to all nodes, should it be called by new thread??
+						return "Transaction created successfully", 200
+					except:                                                                           # Case of unexpected error
+						return "Error creating transaction.", 500
+
+
 		return new_transaction
 
 
-	def broadcast_transaction():
+	def broadcast_transaction(self,transaction):
 		return
 
 

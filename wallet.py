@@ -30,8 +30,11 @@ class wallet:
 		self.transactions=[]						                       # no transactions yet						
 
 
-	def balance():
-		return
+	def balance(self,NBCs_list):										   # parameter is list of unsent UTXOs, returns total NBCs
+		total=0
+		for item in NBCs_list:                                             # sum all the UTXOs of the node
+			total+=item[1]
+		return total
 
 #wall=wallet()
 #print(binascii.b2a_hex(wall.public_key).decode('utf-8'))
