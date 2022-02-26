@@ -20,7 +20,7 @@ import transaction
 def run_app(port):
     app.run(host='127.0.0.1', port=port)
 
-def initial():
+def initial(port):
     #initialize bootstrap node
     
     node_instance.id=0
@@ -37,7 +37,7 @@ def initial():
     #     print('not valid')
 
     # create ring and register self
-    node_info={'node_id': node_instance.id,'address': node_instance.wallet.address, 'public_key': node_instance.wallet.public_key,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
+    node_info={'node_id': node_instance.id,'contact': 'http://127.0.0.1:{}/'.format(port), 'address': node_instance.wallet.public_key, 'public_key': node_instance.wallet.public_key,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
     node_instance.ring.append(node_info)
     return
 
@@ -45,9 +45,10 @@ app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
 node_number=5
+port=5000
 node_instance=Node()
 
-second_thread = threading.Thread(target=initial())
+second_thread = threading.Thread(target=initial(port))
 second_thread.start()
 second_thread.join()
 
@@ -90,11 +91,13 @@ def register_node():
         try: 
             
             # get data for register and register node
+            #print(request.json())
             data=request.get_json()
-            print(node_instance.current_id_count,'cur')
+            print(data)
             public_key=data['public_key']
             address=data['address']
-            if node_instance.register_node_to_ring(public_key,address):
+            contact=data['contact']
+            if node_instance.register_node_to_ring(public_key,address,contact):
                 node_instance.NBCs[node_instance.current_id_count]=[]
                 print(node_instance.NBCs)
 

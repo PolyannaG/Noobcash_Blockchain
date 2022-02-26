@@ -17,17 +17,15 @@ class Node:
 
 		#self.chain
 		self.current_id_count=0
-		#self.NBCs
+		
 		self.id=None	# node id in ring
-		self.NBCs={}    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
+		self.NBCs={}    # dictionary to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
 						# https://academy.binance.com/en/glossary/unspent-transaction-output-utxo
 						# dictionary: NBCs(i) will be a set that holds transaction outputs (transactions from which the
 						# node has received money): list of tuples where first item is the transaction id and the second item is the amount the node gained
-		#self.wallet
-		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??
-
-		#slef.ring[]   #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
-		self.ring=[]
+		
+		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??  
+		self.ring=[]    #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
 		print("creating new node instance")
 
 
@@ -42,11 +40,11 @@ class Node:
 		return wallet()
 		
 
-	def register_node_to_ring(self,public_key,address):
+	def register_node_to_ring(self,public_key,address, contact):
 		#add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
 		#bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
 		try: 
-			node_info={'node_id': self.current_id_count+1, 'address': address, 'public_key': public_key, 'balance': 0}  # 100 NBC to be given later with transaction???
+			node_info={'node_id': self.current_id_count+1,'contact':contact, 'address': address, 'public_key': public_key, 'balance': 0}  # 100 NBC to be given later with transaction???
 			self.current_id_count+=1
 			self.ring.append(node_info)
 
@@ -81,7 +79,8 @@ class Node:
 				total=self.wallet.balance(self.NBCs[sender_id])										  # check that the node has enough NBCs for the transaction	
 				if (total<amount):
 					return "Not enough NBCs for the spesified transaction.", 400, None
-				else:                                                                                 # all checks complete, we are ready to start the transaction
+				else:    
+					print('hi')                                                                             # all checks complete, we are ready to start the transaction
 					try:
 						inputs=[]
 						outputs=[]																		
