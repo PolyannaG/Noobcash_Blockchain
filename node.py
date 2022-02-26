@@ -1,4 +1,5 @@
 from ast import excepthandler
+from binascii import a2b_hex
 from block import Block
 from wallet import wallet
 from transaction import Transaction
@@ -18,7 +19,7 @@ class Node:
 		self.current_id_count=0
 		#self.NBCs
 		self.id=None	# node id in ring
-		self.NBCs=[]    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
+		self.NBCs={}    # list to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
 						# https://academy.binance.com/en/glossary/unspent-transaction-output-utxo
 						# dictionary: NBCs(i) will be a set that holds transaction outputs (transactions from which the
 						# node has received money): list of tuples where first item is the transaction id and the second item is the amount the node gained
@@ -58,30 +59,34 @@ class Node:
 	def create_transaction(self,sender, receiver,amount, signature=None):
 		#remember to broadcast it
 		
-		#logic missing! inputs, outputs, broadcast etx, only for testing
+		#logic missing!  broadcast !!!!
 		if (sender=='0'):																			  # transaction for genesis block	
 			new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
 			new_transaction.transaction_inputs=[]
 			new_transaction.transaction_outputs=[(receiver,amount)]
 			new_transaction.sign_transaction()
-		else:                           															  # usual case
+			return 'Transaction created succesfully', 200, new_transaction
+		
+		else:   
+			print('creating transaction')                        									  # usual case
+			
 			for node_item in self.ring:																  # check that node is indeed part of the ring
 				if (node_item['address']==sender):
 					sender_id=node_item['node_id']
 			if sender_id==None:						
-				return "Sender not part of ring." ,400
+				return "Sender not part of ring." ,400, None
 			elif sender_id!=self.id:																  # check that the node is indeed the current one (for safety, should always be true)
-				return "Sender not current node, you do not own this wallet.", 400
+				return "Sender not current node, you do not own this wallet.", 400, None
 			else:
-				total=self.wallet.balance(self.NBCs(sender_id))										  # check that the node has enough NBCs for the transaction	
+				total=self.wallet.balance(self.NBCs[sender_id])										  # check that the node has enough NBCs for the transaction	
 				if (total<amount):
-					return "Not enough NBCs for the spesified transaction.", 400
+					return "Not enough NBCs for the spesified transaction.", 400, None
 				else:                                                                                 # all checks complete, we are ready to start the transaction
 					try:
 						inputs=[]
 						outputs=[]																		
 						cur_sum=0
-						for item in self.NBCs(sender_id):											  # find the previous transactions the money will come from
+						for item in self.NBCs[sender_id]:											  # find the previous transactions the money will come from
 							cur_sum+=item[1]
 							inputs.append(item)
 							if cur_sum>=amount:
@@ -91,16 +96,16 @@ class Node:
 							outputs.append((sender,difference))
 						outputs.append((receiver,amount))                                             # the money to be given to receiver
 						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
-						new_transaction.transaction_inputs=inputs                                     # add the trasaction inputs
-						new_transaction.transaction_outputs=outputs          		              	  # add the transaction outputs		
+						new_transaction.inputs=inputs                                     # add the trasaction inputs
+						new_transaction.outputs=outputs          		              	  # add the transaction outputs	
 						new_transaction.sign_transaction()											  # sign transaction		
 						self.broadcast_transaction(new_transaction)                                   # broadcast to all nodes, should it be called by new thread??
-						return "Transaction created successfully", 200
+						return "Transaction created successfully", 200 , new_transaction
 					except:                                                                           # Case of unexpected error
-						return "Error creating transaction.", 500
+						return "Error creating transaction.", 500, None
 
 
-		return new_transaction
+		
 
 
 	def broadcast_transaction(self,transaction):
@@ -108,14 +113,53 @@ class Node:
 
 
 
-	def validdate_transaction(transaction):                          # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
+	def validdate_transaction(self,transaction):                          # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
 		#use of signature and NBCs balance
+		print('validating')		
+
 		key=RSA.importKey(transaction.sender_address)                # public key of sender is the sender's address
-		hashed_transaction=SHA.new(transaction.encode('utf-8'))      # hash transaction to verify its signature
-		try:
-			is_verified=PKCS1_v1_5.new(key).verify(hashed_transaction,transaction.signature)  # verify transaction signature
-			if is_verified:                                          # transaction signature validated
-				return                                               # here we will check UTXOs
+		trans_to_hash=str(transaction.to_dict())
+		hashed_transaction=SHA.new(trans_to_hash.encode('utf-8'))      # hash transaction to verify its signature
+		
+		try:	
+			
+			# signature verification
+			signature=a2b_hex(transaction.signature)
+			is_verified=PKCS1_v1_5.new(key).verify(hashed_transaction,signature)  # verify transaction signature
+			
+
+			if is_verified:                                          # transaction signature validated, now we check UTXOs
+				print('verified singature')
+			# check that transaction inputs are unspent
+				for item in self.ring:
+					if transaction.sender_address==item['address']:
+						sender_id=item['node_id']
+				for input in transaction.inputs:                     # check that every input is unspent
+					found_utxo=False
+					print(self.NBCs)
+					for utxo in self.NBCs[sender_id]: 
+						print(self.NBCs)          
+						if utxo[0]==input[0]:
+							found_utxo=True
+							self.NBCs[sender_id].remove(utxo)
+					if not found_utxo:
+						print('utxo not unspent')
+						return False
+				
+			# add transaction outputs to UTXOs list (NBCs)
+				
+				for output in transaction.outputs:                 # inputs unspent, time to add outputs to NBCs list
+					for item in self.ring:                         # find id of node whose wallter will get the NBCs
+						if output[0]==item['address']:
+							print('found node id',item['node_id'])
+							node_id=item['node_id']
+					if node_id==None:
+						print('Node id not found in ring')
+						return False
+					self.NBCs[node_id].append((transaction.transaction_id,output[1]))
+					print('new nbcs:', self.NBCs)
+			
+			return True                                         
 		except:
 			return False
 

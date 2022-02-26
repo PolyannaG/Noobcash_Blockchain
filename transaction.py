@@ -38,10 +38,10 @@ class Transaction:
         N=random.randint(10,20)                                                                                    # random int
         rand_string=Crypto.Random.get_random_bytes(N)                                                              # random byte string of length N
         message_to_hash=str(sender_address)+str(recipient_address)+str(value)+str(rand_string)+str(time.time())    # transaction hash will be created from this message
-        self.transacton_id=SHA.new(message_to_hash.encode()).hexdigest()                                           # encode() converts the string into bytes to be acceptable by hash function
+        self.transaction_id=SHA.new(message_to_hash.encode()).hexdigest()                                           # encode() converts the string into bytes to be acceptable by hash function
                                                                                                                    # create hash object and get encoded hash in hexadecimal format                  
-        self.transaction_inputs=[]    # input list initially empty, will be updated by create_transaction() 
-        self.transaction_outputs=[]   # output list initially empty, will be updated by create_transaction() ?
+        self.inputs=[]    # input list initially empty, will be updated by create_transaction() 
+        self.outputs=[]   # output list initially empty, will be updated by create_transaction() ?
 
     
 
@@ -50,12 +50,14 @@ class Transaction:
         """
         Convert transaction info to dictionary
         """
+        outputs=[str(item) for item in self.outputs]
+        inputs=[str(item) for item in self.inputs]
         transaction_dict=({'sender_address' : str(self.sender_address), 
                             'receiver_address' : str(self.receiver_address),
                             'amount' : self.amount,
-                            'transaction_id' : str(self.transacton_id),
-                            'transaction_inputs' : self.transaction_inputs,
-                            'transaction_outputs' : self.transaction_outputs})
+                            'transaction_id' : str(self.transaction_id),
+                            'transaction_inputs' : inputs,
+                            'transaction_outputs' : outputs})
         return transaction_dict
 
     def sign_transaction(self):
@@ -68,6 +70,7 @@ class Transaction:
         hashed_transaction=SHA.new(transaction_to_sign.encode('utf-8'))      # hash message (transaction)
         signature=PKCS1_v1_5.new(key).sign(hashed_transaction)               # sign using private key
         self.signature=binascii.b2a_hex(signature).decode('utf-8')           # save signature in utf-8 form
+        #self.signature=signature
    
        
 
