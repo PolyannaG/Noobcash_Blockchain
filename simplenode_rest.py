@@ -1,5 +1,6 @@
 import argparse
 from operator import index
+from os import abort
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -7,6 +8,7 @@ import threading
 import time
 from argparse import ArgumentParser
 import argparse
+import sys
 
 
 import block
@@ -21,14 +23,17 @@ import transaction
 #    app.run(host='127.0.0.1', port=port)
 
 def initial(port):
-    
-    #initialize node : perform registrations
+    #initialize node : get registered to ring
     with app.app_context():
         dict_to_send={'public_key': str(node_instance.wallet.public_key),'address': str(node_instance.wallet.public_key), 'contact': 'http://127.0.0.1:{}/'.format(str(port))}
-        print('data',jsonify(dict_to_send))
         res=requests.post('http://127.0.0.1:5000/register', json=dict_to_send)
-        #print(jsonify(res))
-    
+        if (res.status_code==200):                                     # registration succeeded
+            res=res.json()
+            node_instance.id=res['node_id']                            # node id is the one given by bootstrap
+            print('node has been registered to ring by bootstrap')
+        else:                                                          # error in registration
+            print('error in regitration:', res.json()['message'])
+            sys.exit()
     return
 
 

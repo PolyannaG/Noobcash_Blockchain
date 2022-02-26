@@ -86,7 +86,7 @@ def get_transactions():
 @app.route('/register',methods=['POST'])
 def register_node():
     if (node_instance.current_id_count==node_number-1):   # check if we already have n nodes
-        return 'No more nodes can be added', 400
+        return {'message': 'No more nodes can be added'}, 400
     else:                                               # add node to ring
         try: 
             
@@ -113,12 +113,12 @@ def register_node():
                     print('validated')
                 else:
                     print('not valid')
-                return 'Registed to ring', 200
+                return {'message:': 'Registed to ring', 'node_id': node_instance.current_id_count}, 200
             
             else:
-                return 'Error registering node, try again.', 404
+                return {'message:': 'Error registering node, try again.'}, 404
         except:
-            return 'Invalid register info', 400 
+            return {'message': 'Invalid register info'}, 400 
         
 
 #run it once for every node
