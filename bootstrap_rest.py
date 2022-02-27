@@ -17,10 +17,10 @@ import transaction
 
 ### REST API FOR BOOTSTRAP NODE
 
-def run_app(port):
-    app.run(host='127.0.0.1', port=port)
+# def run_app(port):
+#     app.run(host='127.0.0.1', port=port)
 
-def initial(port):
+def initial():
     #initialize bootstrap node
     
     node_instance.id=0
@@ -44,33 +44,12 @@ def initial(port):
 app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
-node_number=5
-port=5000
-node_instance=Node()
 
-second_thread = threading.Thread(target=initial(port))
-second_thread.start()
-second_thread.join()
+
+
 
 
 #.......................................................................................
-# @app.before_first_request
-# def initial(node_instance):
-#     #initialize bootstrap node
-#     node_instance=Node()
-#     node_instance.id=0
-
-#     # create genesis block
-#     genesis_block=node_instance.create_new_block(1,1,0)                                                                 # create genesis block
-#     initial_transaction=node_instance.create_transaction(sender='0', receiver=node_instance.wallet.public_key, amount=100*node_number)           # create initial transaction
-#     blockchain.add_transaction(initial_transaction)
-
-#     # create ring and register self
-#     node_info=[{'node_id': node_instance.id, 'public_key': node_instance.wallet.public_key, 'balance': 100*node_number}]    # IP ADDRESS MISSING!!
-#     node_instance.ring.append(node_info)
-#     print(node_instance.ring)
-#     return
-
 
 
 # get all transactions in the blockchain
@@ -127,10 +106,17 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on',n=5)
+    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
+    parser.add_argument('-n', '--nodes', default=5, type=int, help='number of nodes in ring')
+
     args = parser.parse_args()
     port = args.port
-   
-   
+    node_number=args.nodes
+    
+    node_instance=Node()
+
+    second_thread = threading.Thread(target=initial())
+    second_thread.start()
+    second_thread.join()
         
-    #app.run(host='127.0.0.1', port=port)
+    app.run(host='127.0.0.1', port=port, use_reloader=False)
