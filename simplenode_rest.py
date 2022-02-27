@@ -59,6 +59,7 @@ def get_transactions():
 
 @app.route('/transactions/receive', methods=['POST'])
 def receive_transaction():
+    print('receive trans endpoint')
     data=request.get_json()
     try:
         # get trasnaction data
@@ -95,7 +96,11 @@ def receive_transaction():
         trans.signature=signature
         print("received transaction")
         try:
-            node_instance.validdate_transaction(trans)
+            is_valid=node_instance.validate_transaction(trans)
+            if (not is_valid):
+                print('not valid transaction')
+            else:
+                print("valid transaction")
         except:
             print("not valid transaction")
         return {'message': "Received"}, 200
@@ -103,6 +108,18 @@ def receive_transaction():
         return {'message': "Error in receiving transaction"}, 400
 
 
+@app.route('/ring/get', methods=['POST'])
+def receive_ring():
+    print('receive ring endpoint')
+    data=request.get_json()
+    
+    try:
+        # get trasnaction data
+        
+        node_instance.ring=data['ring']
+        return {'message': "Received"}, 200
+    except:
+        return {'message': "Error in receiving ring"}, 400
 
 
 #run it once for every node

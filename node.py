@@ -9,6 +9,10 @@ from transaction import Transaction
 import requests
 import threading
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from time import sleep
+import time
+import itertools
 
 import Crypto
 import Crypto.Random
@@ -88,18 +92,22 @@ class Node:
 					return "Not enough NBCs for the spesified transaction.", 400, None
 				else:                                                                                 # all checks complete, we are ready to start the transaction
 					try:
+
 						inputs=[]
 						outputs=[]																		
 						cur_sum=0
+						
 						for item in self.NBCs[sender_id]:											  # find the previous transactions the money will come from
 							cur_sum+=item[1]
 							inputs.append(item)
 							if cur_sum>=amount:
 								break
+						
 						difference=cur_sum-amount													  # calculate how much money the sender has to get back				
 						if (difference!=0):
-							outputs.append((binascii.b2a_hex(sender).decode('utf-8'),difference))
+							outputs.append((sender,difference))
 						outputs.append((receiver,amount))                                             # the money to be given to receiver
+						
 						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
 						new_transaction.inputs=inputs                                                 # add the trasaction inputs
 						new_transaction.outputs=outputs          		              	              # add the transaction outputs	
@@ -108,7 +116,7 @@ class Node:
 						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
 						threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
 						#broadcast_thread.start()    
-						print('hi')                             
+						                           
 						return "Transaction created successfully", 200 , new_transaction
 					except:                                                                           # Case of unexpected error
 						return "Error creating transaction.", 500, None
@@ -136,6 +144,7 @@ class Node:
 
 	async def broadcast_transaction(self,transaction):
 		trans_to_broadcast=transaction.to_dict(True)
+		#print(trans_to_broadcast)
 		for node_ in self.ring:
 			sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
 			sent_thread.start()
@@ -144,7 +153,7 @@ class Node:
 						
 
 
-	def validdate_transaction(self,transaction):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
+	def validate_transaction(self,transaction):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
 		#use of signature and NBCs balance
 		print('validating')		
 		sender_address=a2b_hex(transaction.sender_address)
@@ -167,11 +176,12 @@ class Node:
 				for item in self.ring:
 					if transaction.sender_address==item['address']:
 						sender_id=item['node_id']
+						print('found sender in ring',sender_id)
 				for input in transaction.inputs:                     # check that every input is unspent
 					found_utxo=False
 					print(self.NBCs)
-					for utxo in self.NBCs[sender_id]: 
-						print(self.NBCs)          
+
+					for utxo in self.NBCs[sender_id]:           
 						if utxo[0]==input[0]:
 							found_utxo=True
 							self.NBCs[sender_id].remove(utxo)
@@ -196,7 +206,54 @@ class Node:
 		except:
 			return False
 
-        
+
+
+	def persistent_sending_data_to_nodes(self,*args):
+		node_,data,num=args
+		sent=False
+		while(not sent):																# try to send ring until succesful
+			try:
+				res=requests.post('{}/ring/get'.format(node_['contact']), json=data)
+				if (res.status_code==200):                                              # ring sent
+					print('ring sent to node:', node_['node_id'])			
+					sent=True	
+					num[0]+=1															# increase number of nodes that have received the ring
+					if (num[0]==len(self.ring)):                                        # if all nodes have received the ring, time to broadcast blockchain
+						# LOGIC MISSING!!!!!!!!!!! BLOCKCHAIN BROADCAST!!!!
+						self.make_transfer()											# after having broadcasted the blockchain it is time to make the first transactions
+						
+				else:                                                                   # error in sending
+					print("error sending ring to node:", node_['node_id'], res.json()['message'])
+					sent=False
+					
+			except:
+				print("error2 sending ring to node:", node_['node_id'])
+				sent=False
+				
+				
+
+	def send_data_to_nodes_give_blockchain_and_make_transfer(self):                                      
+		# function for the bootstrap to send to the nodes the ring, the blockchain so far, and to create and send the initial transactions
+		data={"ring": self.ring}       # data to send at first is the ring
+		num=[0]						   # variable to hold how many nodes have received the ring
+		for node_ in self.ring:        # send ring to all nodes in ring
+			t=threading.Thread(target=self.persistent_sending_data_to_nodes, args=(node_,data,num))     # new thread for each node, call insinde function for the rest of the functionality
+			t.start()
+			
+	
+	def make_transfer(self):                   # function to transfer 100 NBCs from the bootstrap node to all the other nodes of the ring
+		for node_ in self.ring:                # for every node in the ring:
+			if node_['node_id']==0:            # except from bootstrap
+				print('not for bootstrap')
+				continue
+			message,error_code,trans=self.create_transaction(self.wallet.address,node_['address'],100)
+			if error_code!=200:
+				return message,error_code,False
+			print('finished',node_['node_id'])
+			
+
+
+       
 
 
 	def add_transaction_to_block():
@@ -211,6 +268,11 @@ class Node:
 
 	def broadcast_block():
 		return
+
+
+
+    
+		
 
 		
 

@@ -1,19 +1,21 @@
 import argparse
 from operator import index
 import requests
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, g
 from flask_cors import CORS
 import threading
 import time
 from argparse import ArgumentParser
 import argparse
+import asyncio
+import binascii
 
 
 import block
 from node import Node
 from blockchain import Blockchain
 from wallet import wallet
-import transaction
+from transaction import Transaction
 
 ### REST API FOR BOOTSTRAP NODE
 
@@ -37,13 +39,16 @@ def initial():
     #     print('not valid')
 
     # create ring and register self
-    node_info={'node_id': node_instance.id,'contact': 'http://127.0.0.1:{}/'.format(port), 'address': node_instance.wallet.public_key, 'public_key': node_instance.wallet.public_key,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
+    address=binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8')
+    node_info={'node_id': node_instance.id,'contact': 'http://127.0.0.1:{}/'.format(port), 'address': address, 'public_key': address,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
     node_instance.ring.append(node_info)
     return
 
 app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
+
+
 
 
 
@@ -78,12 +83,18 @@ def register_node():
             if node_instance.register_node_to_ring(public_key,address,contact):
                 node_instance.NBCs[node_instance.current_id_count]=[]
 
-                # create transaction to transfer 100 NBCs
-                message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
-                if error_code!=200:
-                    return message, error_code
+                # # create transaction to transfer 100 NBCs
+                # message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
+                # if error_code!=200:
+                #     return message, error_code
                 print('after creation')
-                print(node_instance.ring)
+
+                if (node_instance.current_id_count==node_number-1):
+                    node_instance.send_data_to_nodes_give_blockchain_and_make_transfer()
+                   
+                    
+                    print('node ring full')
+
                 return {'message:': 'Registed to ring', 'node_id': node_instance.current_id_count}, 200
                
                 # # validate created transaction
@@ -101,6 +112,76 @@ def register_node():
         except:
             return {'message': 'Invalid register info'}, 400 
         
+@app.route('/transactions/receive', methods=['POST'])
+def receive_transaction():
+    print('receive trans endpoint')
+    data=request.get_json()
+    try:
+        # get trasnaction data
+        sender_address=data['sender_address']
+        receiver_address=data['receiver_address']
+        amount=data['amount']
+        transaction_id=data['transaction_id']
+        transaction_inputs=data['transaction_inputs']
+        transaction_outputs=data['transaction_outputs']
+        signature=data['signature']
+
+        
+        # correct datatypes
+        inputs=[]
+        for item in transaction_inputs:
+            input=(tuple(item))
+            inputs.append(input)
+            
+        outputs=[]
+        for item in transaction_outputs:
+            # print(item)
+            # temp=item[1:-1].split(',')
+            # temp=tuple(temp)
+            # output=(temp[0][1:-1],int(temp[1]))
+            output=tuple(item)
+            outputs.append(output)
+
+        
+        # create transaction object
+        trans=Transaction(sender_address,None,receiver_address,amount)
+        trans.transaction_id=transaction_id
+        trans.inputs=inputs
+        trans.outputs=outputs
+        trans.signature=signature
+        print("received transaction")
+        try:
+            is_valid=node_instance.validate_transaction(trans)
+            if (not is_valid):
+                print('not valid transaction')
+            else:
+                print("valid transaction")
+        except:
+            print("not valid transaction")
+        return {'message': "Received"}, 200
+    except:
+        return {'message': "Error in receiving transaction"}, 400
+
+
+@app.route('/ring/get', methods=['POST'])
+def receive_ring():
+    print('receive ring endpoint')
+    data=request.get_json()
+    
+    try:
+        # get trasnaction data
+        
+        node_instance.ring=data['ring']
+        return {'message': "Received"}, 200
+    except:
+        return {'message': "Error in receiving ring"}, 400
+
+
+
+
+
+
+
 
 #run it once for every node
 
