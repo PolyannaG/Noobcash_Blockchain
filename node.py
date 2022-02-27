@@ -1,8 +1,14 @@
 from ast import excepthandler
 from binascii import a2b_hex
+import binascii
+from inspect import signature
+from platform import node
 from block import Block
 from wallet import wallet
 from transaction import Transaction
+import requests
+import threading
+import asyncio
 
 import Crypto
 import Crypto.Random
@@ -63,6 +69,7 @@ class Node:
 			new_transaction.transaction_inputs=[]
 			new_transaction.transaction_outputs=[(receiver,amount)]
 			new_transaction.sign_transaction()
+			
 			return 'Transaction created succesfully', 200, new_transaction
 		
 		else:   
@@ -79,8 +86,7 @@ class Node:
 				total=self.wallet.balance(self.NBCs[sender_id])										  # check that the node has enough NBCs for the transaction	
 				if (total<amount):
 					return "Not enough NBCs for the spesified transaction.", 400, None
-				else:    
-					print('hi')                                                                             # all checks complete, we are ready to start the transaction
+				else:                                                                                 # all checks complete, we are ready to start the transaction
 					try:
 						inputs=[]
 						outputs=[]																		
@@ -92,40 +98,68 @@ class Node:
 								break
 						difference=cur_sum-amount													  # calculate how much money the sender has to get back				
 						if (difference!=0):
-							outputs.append((sender,difference))
+							outputs.append((binascii.b2a_hex(sender).decode('utf-8'),difference))
 						outputs.append((receiver,amount))                                             # the money to be given to receiver
 						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
-						new_transaction.inputs=inputs                                     # add the trasaction inputs
-						new_transaction.outputs=outputs          		              	  # add the transaction outputs	
-						new_transaction.sign_transaction()											  # sign transaction		
-						self.broadcast_transaction(new_transaction)                                   # broadcast to all nodes, should it be called by new thread??
+						new_transaction.inputs=inputs                                                 # add the trasaction inputs
+						new_transaction.outputs=outputs          		              	              # add the transaction outputs	
+						new_transaction.sign_transaction()											  # sign transaction	
+						
+						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
+						threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
+						#broadcast_thread.start()    
+						print('hi')                             
 						return "Transaction created successfully", 200 , new_transaction
 					except:                                                                           # Case of unexpected error
 						return "Error creating transaction.", 500, None
 
 
-		
+	def persistent_sending(*args):
+		_,node_,trans_to_broadcast=args
+		sent=False
+		while(not sent):
+			try:
+				res=requests.post('{}/transactions/receive'.format(node_['contact']), json=trans_to_broadcast)
+				if (res.status_code==200):                                     # transaction sent
+					print('transaction sent to node:', node_['node_id'])			
+					sent=True			
+				else:                                                          # error in sending
+					print("error sending transaction to node:", node_['node_id'], res.json()['message'])
+					sent=False
+					sent=True
+			except:
+				print("error sending transaction to node:", node_['node_id'])
+				sent=False
+				sent=True
 
 
-	def broadcast_transaction(self,transaction):
-		return
+
+	async def broadcast_transaction(self,transaction):
+		trans_to_broadcast=transaction.to_dict(True)
+		for node_ in self.ring:
+			sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
+			sent_thread.start()
+
+			
+						
 
 
-
-	def validdate_transaction(self,transaction):                          # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
+	def validdate_transaction(self,transaction):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
 		#use of signature and NBCs balance
 		print('validating')		
-
-		key=RSA.importKey(transaction.sender_address)                # public key of sender is the sender's address
+		sender_address=a2b_hex(transaction.sender_address)
+		key=RSA.importKey(sender_address)                              # public key of sender is the sender's address
+		print('key imported')
+		signature=a2b_hex(transaction.signature)	
 		trans_to_hash=str(transaction.to_dict())
 		hashed_transaction=SHA.new(trans_to_hash.encode('utf-8'))      # hash transaction to verify its signature
 		
 		try:	
 			
 			# signature verification
-			signature=a2b_hex(transaction.signature)
-			is_verified=PKCS1_v1_5.new(key).verify(hashed_transaction,signature)  # verify transaction signature
-			
+			# signature=a2b_hex(transaction.signature)
+			# print('signature')
+			is_verified=PKCS1_v1_5.new(key).verify(hashed_transaction,signature)  # verify transaction signature			
 
 			if is_verified:                                          # transaction signature validated, now we check UTXOs
 				print('verified singature')

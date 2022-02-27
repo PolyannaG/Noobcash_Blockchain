@@ -1,6 +1,7 @@
 import argparse
 from operator import index
 from os import abort
+from turtle import pu
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -15,8 +16,8 @@ import block
 from node import Node
 from blockchain import Blockchain
 from wallet import wallet
-import transaction
-
+from transaction import Transaction
+import binascii
 ### REST API FOR THE REST OF THE NODES
 
 #def run_app(port):
@@ -25,7 +26,8 @@ import transaction
 def initial():
     #initialize node : get registered to ring
     with app.app_context():
-        dict_to_send={'public_key': str(node_instance.wallet.public_key),'address': str(node_instance.wallet.public_key), 'contact': 'http://127.0.0.1:{}/'.format(str(port))}
+        pub_key= binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8')
+        dict_to_send={'public_key': pub_key,'address':pub_key, 'contact': 'http://127.0.0.1:{}/'.format(str(port))}
         res=requests.post('http://127.0.0.1:5000/register', json=dict_to_send)
         if (res.status_code==200):                                     # registration succeeded
             res=res.json()
@@ -54,6 +56,52 @@ def get_transactions():
     response = {'transactions': transactions}
     print(transactions)
     return jsonify(response), 200
+
+@app.route('/transactions/receive', methods=['POST'])
+def receive_transaction():
+    data=request.get_json()
+    try:
+        # get trasnaction data
+        sender_address=data['sender_address']
+        receiver_address=data['receiver_address']
+        amount=data['amount']
+        transaction_id=data['transaction_id']
+        transaction_inputs=data['transaction_inputs']
+        transaction_outputs=data['transaction_outputs']
+        signature=data['signature']
+
+        
+        # correct datatypes
+        inputs=[]
+        for item in transaction_inputs:
+            input=(tuple(item))
+            inputs.append(input)
+            
+        outputs=[]
+        for item in transaction_outputs:
+            # print(item)
+            # temp=item[1:-1].split(',')
+            # temp=tuple(temp)
+            # output=(temp[0][1:-1],int(temp[1]))
+            output=tuple(item)
+            outputs.append(output)
+
+        
+        # create transaction object
+        trans=Transaction(sender_address,None,receiver_address,amount)
+        trans.transaction_id=transaction_id
+        trans.inputs=inputs
+        trans.outputs=outputs
+        trans.signature=signature
+        print("received transaction")
+        try:
+            node_instance.validdate_transaction(trans)
+        except:
+            print("not valid transaction")
+        return {'message': "Received"}, 200
+    except:
+        return {'message': "Error in receiving transaction"}, 400
+
 
 
 

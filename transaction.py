@@ -46,18 +46,38 @@ class Transaction:
     
 
 
-    def to_dict(self):       
+    def to_dict(self,add_signature=False):       
         """
         Convert transaction info to dictionary
         """
-        outputs=[str(item) for item in self.outputs]
-        inputs=[str(item) for item in self.inputs]
-        transaction_dict=({'sender_address' : str(self.sender_address), 
-                            'receiver_address' : str(self.receiver_address),
+
+        if (type(self.sender_address)==bytes):
+                sender_address=binascii.b2a_hex(self.sender_address).decode('utf-8')
+        else: 
+            sender_address=self.sender_address
+        if (type(self.receiver_address)==bytes):
+            receiver_address=binascii.b2a_hex(self.receiver_address).decode('utf-8')
+        else: 
+            receiver_address=self.receiver_address
+
+        if not add_signature:
+            transaction_dict=({'sender_address' : sender_address, 
+                                'receiver_address' : receiver_address,
+                                'amount' : self.amount,
+                                'transaction_id' : str(self.transaction_id),
+                                'transaction_inputs' : self.inputs,
+                                'transaction_outputs' : self.outputs})
+                                
+        else:
+            transaction_dict=({'sender_address' : sender_address, 
+                            'receiver_address' : receiver_address,
                             'amount' : self.amount,
                             'transaction_id' : str(self.transaction_id),
-                            'transaction_inputs' : inputs,
-                            'transaction_outputs' : outputs})
+                            'transaction_inputs' : self.inputs,
+                            'transaction_outputs' : self.outputs,
+                            'signature': self.signature})
+           
+
         return transaction_dict
 
     def sign_transaction(self):
@@ -70,10 +90,5 @@ class Transaction:
         hashed_transaction=SHA.new(transaction_to_sign.encode('utf-8'))      # hash message (transaction)
         signature=PKCS1_v1_5.new(key).sign(hashed_transaction)               # sign using private key
         self.signature=binascii.b2a_hex(signature).decode('utf-8')           # save signature in utf-8 form
-        #self.signature=signature
    
        
-
-#wall=wallet()      
-#tran=Transaction("ddd",wall.private_key,"www",10)
-#tran.sign_transaction()

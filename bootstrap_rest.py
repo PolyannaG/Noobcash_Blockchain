@@ -70,29 +70,31 @@ def register_node():
         try: 
             
             # get data for register and register node
-            #print(request.json())
+
             data=request.get_json()
-            print(data)
             public_key=data['public_key']
             address=data['address']
             contact=data['contact']
             if node_instance.register_node_to_ring(public_key,address,contact):
                 node_instance.NBCs[node_instance.current_id_count]=[]
-                print(node_instance.NBCs)
 
                 # create transaction to transfer 100 NBCs
                 message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
                 if error_code!=200:
                     return message, error_code
                 print('after creation')
-               
-                # validate created transaction
-                is_valid=node_instance.validdate_transaction(trans)
-                if is_valid:
-                    print('validated')
-                else:
-                    print('not valid')
+                print(node_instance.ring)
                 return {'message:': 'Registed to ring', 'node_id': node_instance.current_id_count}, 200
+               
+                # # validate created transaction
+                # is_valid=node_instance.validdate_transaction(trans)
+                # if is_valid:
+                #     print('validated')
+                #     return {'message:': 'Registed to ring', 'node_id': node_instance.current_id_count}, 200
+                # else:
+                #     print('not valid')
+                #     return {'message:': 'Error registering node, try again.'}, 404
+                
             
             else:
                 return {'message:': 'Error registering node, try again.'}, 404
