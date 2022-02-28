@@ -1,6 +1,7 @@
 from ast import excepthandler
 from binascii import a2b_hex
 import binascii
+from cProfile import run
 from inspect import signature
 from platform import node
 from block import Block
@@ -25,8 +26,9 @@ class Node:
 		#self.NBC=100;
 		##set
 
-		#self.chain
+		self.chain=[]
 		self.current_id_count=0
+		self.node_number=None
 		
 		self.id=None	# node id in ring
 		self.NBCs={}    # dictionary to hold unspent UTXOs of all nodes --> should it keep total amount of unspent UTXOs or different transaction outputs?
@@ -35,14 +37,15 @@ class Node:
 						# node has received money): list of tuples where first item is the transaction id and the second item is the amount the node gained
 		
 		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??  
-		self.ring=[]    #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+		self.ring=[]    #here we store information for every node, as its id, its address (ip:port) its public key and its balance
+		self.current_block=None 
 		print("creating new node instance")
 
 
 
-	def create_new_block(self,index,previousHash,nonce):
+	def create_new_block(self,index,previousHash,nonce,capacity=5):
 		print("creating new block")
-		new_block=Block(index,previousHash,nonce)
+		new_block=Block(index,previousHash,nonce,capacity)
 		return new_block
 
 	def create_wallet(self):
@@ -114,7 +117,7 @@ class Node:
 						new_transaction.sign_transaction()											  # sign transaction	
 						
 						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
-						threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
+						#threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
 						#broadcast_thread.start()    
 						                           
 						return "Transaction created successfully", 200 , new_transaction
@@ -220,8 +223,8 @@ class Node:
 					num[0]+=1															# increase number of nodes that have received the ring
 					if (num[0]==len(self.ring)):                                        # if all nodes have received the ring, time to broadcast blockchain
 						# LOGIC MISSING!!!!!!!!!!! BLOCKCHAIN BROADCAST!!!!
-						self.make_transfer()											# after having broadcasted the blockchain it is time to make the first transactions
-						
+						#self.make_transfer()											# after having broadcasted the blockchain it is time to make the first transactions
+						print("all nodes have reiced ring")
 				else:                                                                   # error in sending
 					print("error sending ring to node:", node_['node_id'], res.json()['message'])
 					sent=False
@@ -256,13 +259,50 @@ class Node:
        
 
 
-	def add_transaction_to_block():
+	def add_transaction_to_block(self,transaction):
 		#if enough transactions  mine
+		if self.current_block==None:
+			print("creating new block",transaction)
+			self.current_block=self.create_new_block(0,1,None,2)
+		self.current_block.listOfTransactions.append(transaction)
+		if len(self.current_block.listOfTransactions)==self.current_block.capacity:
+			print("block is full")
+			#t=threading.Thread(target=asyncio.run, args=(self.mine_block(self.current_block),))
+			#threading.Thread(target=asyncio.run,args=(self.mine_block(self.current_block),)).start()
+			try:
+				t=threading.Thread(target=asyncio.run, args=(self.mine_block(self.current_block),))
+				t.start()
+			except Exception as e:
+				print(e)
+				return
+			#t.start()
+			self.current_block=None
 		return
 
 
 
-	def mine_block():
+	async def mine_block(self,block_to_mine):
+		
+		sleep(3)
+
+		# start mining
+		print("mining block")
+		block_to_mine.nonce=0															# set initial nonce
+		while not block_to_mine.myHash().startswith('0'*block_to_mine.difficulty):      # keep trying hashing with a different once until number of zeros specified is reached
+			block_to_mine.nonce+=1													
+			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
+		print('block mined')
+
+		# mining finished, time to broadcast block to all nodes (if we already have a completed ring)
+		if len(self.ring)<self.node_number:
+			print("nodes not here yet, no block broadcast")
+			self.chain.append(block_to_mine)                                           # add block straight to chain, it will be shared with the nodes later
+																					   # should the chain object the Blockchain or a list?
+
+		# if ring is not completed we are at initialization stage (bootstrap node), block straight to blockchain
+		if len(self.ring)==self.node_number:
+			print("all nodes here, normal case")
+
 		return
 
 

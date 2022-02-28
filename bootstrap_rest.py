@@ -83,12 +83,15 @@ def register_node():
             if node_instance.register_node_to_ring(public_key,address,contact):
                 node_instance.NBCs[node_instance.current_id_count]=[]
 
-                # # create transaction to transfer 100 NBCs
-                # message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
-                # if error_code!=200:
-                #     return message, error_code
+                # create transaction to transfer 100 NBCs
+                message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
+                #threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                
+                if error_code!=200:
+                    return message, error_code
                 print('after creation')
 
+                node_instance.add_transaction_to_block(trans)
                 if (node_instance.current_id_count==node_number-1):
                     node_instance.send_data_to_nodes_give_blockchain_and_make_transfer()
                    
@@ -197,6 +200,7 @@ if __name__ == '__main__':
     node_number=args.nodes
     
     node_instance=Node()
+    node_instance.node_number=node_number
 
     second_thread = threading.Thread(target=initial())
     second_thread.start()

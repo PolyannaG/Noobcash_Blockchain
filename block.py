@@ -6,7 +6,7 @@ import time
 
 
 class Block:
-	def __init__(self,index,previousHash,nonce):
+	def __init__(self,index,previousHash,nonce,capacity=5):
 		##set
 		self.index=index
 		self.previousHash=previousHash
@@ -14,6 +14,8 @@ class Block:
 		self.hash=None
 		self.nonce=nonce
 		self.listOfTransactions=[]
+		self.capacity=capacity
+		self.difficulty=5
 		
 	
 	def to_dict(self):
@@ -30,8 +32,9 @@ class Block:
 
 	def myHash(self):
 		#calculate self.hash
-		value_to_hash=self.to_dict()
+		value_to_hash=str(self.to_dict())
 		self.hash=SHA.new(value_to_hash.encode('utf-8'))
+		return self.hash.hexdigest()
 		
 
 

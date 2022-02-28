@@ -1,6 +1,7 @@
 import argparse
 from operator import index
 from os import abort
+from platform import node
 from turtle import pu
 import requests
 from flask import Flask, jsonify, request, render_template
@@ -117,6 +118,7 @@ def receive_ring():
         # get trasnaction data
         
         node_instance.ring=data['ring']
+        node_instance.node_number=len(node_instance.ring)
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving ring"}, 400
