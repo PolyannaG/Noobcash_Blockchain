@@ -370,6 +370,7 @@ class Node:
 									return	
 								else:												# otherwise mining will continue
 									block_to_mine.index=self.chain[-1].index+1      # correct block index
+									block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
 									block_to_mine.nonce=0							# restart nonce															
 									
 
