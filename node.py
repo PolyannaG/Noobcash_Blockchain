@@ -418,11 +418,12 @@ class Node:
 
 
 	def validate_block(self,block):
-		print(block.listOfTransactions)
+		#print(block.listOfTransactions)
 		load_dotenv()
-		print(os.getenv('DIFFICULTY'))
+		#print(os.getenv('DIFFICULTY'))
 		if block.myHash().startswith('0'*int(os.getenv('DIFFICULTY'))):  # check that block hash is correct
 			#should check previous hash here
+			print(self.chain)
 			print('hash ok')
 			return True
 		else:
