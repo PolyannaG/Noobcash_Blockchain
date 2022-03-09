@@ -4,6 +4,8 @@ import binascii
 from cProfile import run
 from inspect import signature
 from platform import node
+
+from dotenv import load_dotenv
 from block import Block
 from wallet import wallet
 from transaction import Transaction
@@ -13,7 +15,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 import time
-import itertools
+import os
 
 import Crypto
 import Crypto.Random
@@ -25,6 +27,8 @@ class Node:
 	def __init__(self):
 		#self.NBC=100;
 		##set
+
+		self.block_capacity=2
 
 		self.chain=[]
 		self.current_id_count=0
@@ -143,13 +147,28 @@ class Node:
 				sent=False
 				sent=True
 
+	def transaction_sending(*args):
+		_,node_,trans_to_broadcast=args
+		
+		
+		try:
+			res=requests.post('{}/transactions/receive'.format(node_['contact']), json=trans_to_broadcast)
+			if (res.status_code==200):                                     # transaction sent
+				print('transaction sent to node:', node_['node_id'])						
+			else:                                                          # error in sending
+				print("error sending transaction to node:", node_['node_id'], res.json()['message'])
+		except:
+			print("error2 sending transaction to node:", node_['node_id'])
+
+
 
 
 	async def broadcast_transaction(self,transaction):
 		trans_to_broadcast=transaction.to_dict(True)
 		#print(trans_to_broadcast)
 		for node_ in self.ring:
-			sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
+			#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
+			sent_thread=threading.Thread(target=self.transaction_sending,args=(node_,trans_to_broadcast))
 			sent_thread.start()
 
 			
@@ -211,7 +230,53 @@ class Node:
 
 
 
-	def persistent_sending_data_to_nodes(self,*args):
+	async def send_blockchain(self):							     # function for bootstrap to send blockchain_to_nodes
+		block_list=[]
+		for i in range(0,len(self.chain)):					 # create list of blocks in sendable form
+			block_list.append(self.chain[i].to_dict(True))
+		data=block_list
+		num=[0]						   						# variable to hold how many nodes have received the ring
+		for node_ in self.ring[1:]:       					    # send ring to all nodes in ring
+			t=threading.Thread(target=self.persistent_sending_blockchain_to_nodes, args=(node_,data,num))     # new thread for each node, call insinde function for the rest of the functionality
+			t.start()
+
+
+	def persistent_sending_blockchain_to_nodes(self,*args):
+			node_,data,num=args
+			sent=False
+			while(not sent):																# try to send ring until succesful
+				try:
+					res=requests.post('{}/blockchain/get'.format(node_['contact']), json=data)
+					if (res.status_code==200):                                              # ring sent
+						print('blockchain sent to node:', node_['node_id'])			
+						sent=True	
+						num[0]+=1															# increase number of nodes that have received the ring
+						if (num[0]==len(self.ring)-1):                                        # if all nodes have received the ring, time to broadcast blockchain
+							print("all nodes have received blockchain")
+
+							message,error_code,trans=self.create_transaction(self.wallet.address,self.ring[-1]['address'],100)
+							#threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+							
+							if error_code!=200:
+								return message, error_code
+							print('after creation')
+
+							self.add_transaction_to_block(trans)
+
+
+					else:                                                                   # error in sending
+						print("error sending blockchain to node:", node_['node_id'], res.json()['message'])
+						sent=False
+						
+						
+				except:
+					print("error2 sending blockchain to node:", node_['node_id'])
+					sent=False
+					
+
+
+
+	def persistent_sending_ring_to_nodes(self,*args):
 		node_,data,num=args
 		sent=False
 		while(not sent):																# try to send ring until succesful
@@ -222,9 +287,12 @@ class Node:
 					sent=True	
 					num[0]+=1															# increase number of nodes that have received the ring
 					if (num[0]==len(self.ring)):                                        # if all nodes have received the ring, time to broadcast blockchain
-						# LOGIC MISSING!!!!!!!!!!! BLOCKCHAIN BROADCAST!!!!
-						#self.make_transfer()											# after having broadcasted the blockchain it is time to make the first transactions
+						
 						print("all nodes have reiced ring")
+
+						# all nodes have received ring, time to broadcast blockchain
+						t=threading.Thread(target=asyncio.run, args=(self.send_blockchain(),))
+						t.start()
 				else:                                                                   # error in sending
 					print("error sending ring to node:", node_['node_id'], res.json()['message'])
 					sent=False
@@ -235,35 +303,37 @@ class Node:
 				
 				
 
-	def send_data_to_nodes_give_blockchain_and_make_transfer(self):                                      
+	def send_data_to_nodes_give_blockchain(self):                                      
 		# function for the bootstrap to send to the nodes the ring, the blockchain so far, and to create and send the initial transactions
 		data={"ring": self.ring}       # data to send at first is the ring
 		num=[0]						   # variable to hold how many nodes have received the ring
 		for node_ in self.ring:        # send ring to all nodes in ring
-			t=threading.Thread(target=self.persistent_sending_data_to_nodes, args=(node_,data,num))     # new thread for each node, call insinde function for the rest of the functionality
+			t=threading.Thread(target=self.persistent_sending_ring_to_nodes, args=(node_,data,num))     # new thread for each node, call insinde function for the rest of the functionality
 			t.start()
 			
 	
-	def make_transfer(self):                   # function to transfer 100 NBCs from the bootstrap node to all the other nodes of the ring
-		for node_ in self.ring:                # for every node in the ring:
-			if node_['node_id']==0:            # except from bootstrap
-				print('not for bootstrap')
-				continue
-			message,error_code,trans=self.create_transaction(self.wallet.address,node_['address'],100)
-			if error_code!=200:
-				return message,error_code,False
-			print('finished',node_['node_id'])
-			
-
-
-       
+	# def make_transfer(self):                   # function to transfer 100 NBCs from the bootstrap node to all the other nodes of the ring
+	# 	for node_ in self.ring:                # for every node in the ring:
+	# 		if node_['node_id']==0:            # except from bootstrap
+	# 			print('not for bootstrap')
+	# 			continue
+	# 		message,error_code,trans=self.create_transaction(self.wallet.address,node_['address'],100)
+	# 		if error_code!=200:
+	# 			return message,error_code,False
+	# 		print('finished',node_['node_id'])		
 
 
 	def add_transaction_to_block(self,transaction):
 		#if enough transactions  mine
 		if self.current_block==None:
 			print("creating new block",transaction)
-			self.current_block=self.create_new_block(0,1,None,2)
+			if self.chain==[]:                                            # case of genesis block
+				self.current_block=self.create_new_block(0,1,None,1)
+			elif len(self.chain)==1:									  # case of initial transactions from bootstrap, they will be a block	
+				self.current_block=self.create_new_block(self.chain[-1].index+1, self.chain[-1].hash, None, self.node_number-1)
+			else:
+				self.current_block=self.create_new_block(self.chain[-1].index+1, self.chain[-1].hash, None, self.block_capacity)  # usual case, create next current block following the last of the blockchain
+
 		self.current_block.listOfTransactions.append(transaction)
 		if len(self.current_block.listOfTransactions)==self.current_block.capacity:
 			print("block is full")
@@ -275,15 +345,11 @@ class Node:
 			except Exception as e:
 				print(e)
 				return
-			#t.start()
 			self.current_block=None
 		return
 
 
-
 	async def mine_block(self,block_to_mine):
-		
-		sleep(3)
 
 		# start mining
 		print("mining block")
@@ -291,29 +357,78 @@ class Node:
 		while not block_to_mine.myHash().startswith('0'*block_to_mine.difficulty):      # keep trying hashing with a different once until number of zeros specified is reached
 			block_to_mine.nonce+=1													
 			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
+			
+			# check that transactions have not already been included to blockchain by a different node
+			if self.chain!=[] and self.chain[-1].index>=block_to_mine.index: 					# check if new block has been added
+				for block_item in self.chain[block_to_mine.index:]:			# for all new added blocks
+					for trans in block_item.listOfTransactions:				# for all transactions of the blocks
+						for i in range(0,len(block_to_mine.listOfTranscations)):	# check if they exist in the block beeing mined
+							if trans.transaction_id==block_to_mine.listOfTransactions[i].transaction_id:
+								block_to_mine.listOfTransactions.pop(i)             # if yes, remove them from block being mined
+								if len(block_to_mine.listOfTransactions)==0:		# if no more transactions in block, stop mining
+									print("stoping block mining, all transactions already mined")
+									return	
+								else:												# otherwise mining will continue
+									block_to_mine.index=self.chain[-1].index+1      # correct block index
+									block_to_mine.nonce=0							# restart nonce															
+									
+
 		print('block mined')
 
 		# mining finished, time to broadcast block to all nodes (if we already have a completed ring)
+
+		# if ring is not completed we are at initialization stage (bootstrap node), block straight to blockchain
 		if len(self.ring)<self.node_number:
 			print("nodes not here yet, no block broadcast")
 			self.chain.append(block_to_mine)                                           # add block straight to chain, it will be shared with the nodes later
 																					   # should the chain object the Blockchain or a list?
 
-		# if ring is not completed we are at initialization stage (bootstrap node), block straight to blockchain
+		# otherwise, all nodes are in the ring: normal case, mined block has to be broadcasted
 		if len(self.ring)==self.node_number:
 			print("all nodes here, normal case")
+			threading.Thread(target=asyncio.run,args=(self.broadcast_block(block_to_mine),)).start()
+
 
 		return
 
 
-	def broadcast_block():
+
+	def block_sending(*args):
+			_,node_,block_to_broadcast=args
+						
+			try:
+				res=requests.post('{}/blocks/receive'.format(node_['contact']), json=block_to_broadcast)
+				if (res.status_code==200):                                     # block sent
+					print('block sent to node:', node_['node_id'])						
+				else:                                                          # error in sending
+					print("error sending block to node:", node_['node_id'], res.json()['message'])
+			except:
+				print("error2 sending block to node:", node_['node_id'])
+
+
+	async def broadcast_block(self, block):
+		block_to_broadcast=block.to_dict(True)
+		for node_ in self.ring:
+			#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,block_to_broadcast))
+			sent_thread=threading.Thread(target=self.block_sending,args=(node_,block_to_broadcast))
+			sent_thread.start()
 		return
 
 
 
-    
-		
 
+	def validate_block(self,block):
+		print(block.listOfTransactions)
+		load_dotenv()
+		print(os.getenv('DIFFICULTY'))
+		if block.myHash().startswith('0'*int(os.getenv('DIFFICULTY'))):  # check that block hash is correct
+			#should check previous hash here
+			print('hash ok')
+			return True
+		else:
+			print('hash not ok')
+			return False
+   
 		
 
 	#def valid_proof(.., difficulty=MINING_DIFFICULTY):

@@ -1,4 +1,5 @@
 import argparse
+from cmath import e
 from operator import index
 from os import abort
 from platform import node
@@ -11,6 +12,7 @@ import time
 from argparse import ArgumentParser
 import argparse
 import sys
+import os
 
 
 import block
@@ -43,6 +45,67 @@ def initial():
 app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
+node_instance=Node()
+
+#......................................................................................
+
+def process_transaction(item):
+    try:
+        sender_address=item['sender_address']
+        receiver_address=item['receiver_address']
+        amount=item['amount']
+        transaction_id=item['transaction_id']
+        transaction_inputs=item['transaction_inputs']
+        transaction_outputs=item['transaction_outputs']
+        signature=item['signature']
+        
+        # correct datatypes
+        inputs=[]
+        for item in transaction_inputs:
+            input=(tuple(item))
+            inputs.append(input)
+            
+        outputs=[]
+        for item in transaction_outputs:
+            output=tuple(item)
+            outputs.append(output)
+
+        
+        # create transaction object
+        trans=Transaction(sender_address,None,receiver_address,amount)
+        trans.transaction_id=transaction_id
+        trans.inputs=inputs
+        trans.outputs=outputs
+        trans.signature=signature
+
+        return trans
+    except:
+        return None
+
+def process_block(data):
+    try:
+        previous_hash=data['previous_hash']
+        index=data['index']
+        timestamp=data['timestamp']
+        list_of_transactions=data['list_of_transactions']
+        nonce=data['nonce']
+        hash=data['hash']
+        capacity=data['capacity']
+
+        proccessed_transaction_list=[]                              # list to add all transactions of block in object form
+        for item in list_of_transactions:                           # convert all transaction objects back to object form                
+            trans=process_transaction(item)
+            if trans==None:
+                return {'message': "Error in receiving block"}, 400
+            proccessed_transaction_list.append(trans)
+        new_block=node_instance.create_new_block(index,previous_hash,nonce,capacity)
+        new_block.timestamp=timestamp
+        new_block.hash=hash
+        new_block.listOfTransactions=proccessed_transaction_list
+        return new_block
+    except:
+        return None
+
 
 
 #.......................................................................................
@@ -64,37 +127,9 @@ def receive_transaction():
     data=request.get_json()
     try:
         # get trasnaction data
-        sender_address=data['sender_address']
-        receiver_address=data['receiver_address']
-        amount=data['amount']
-        transaction_id=data['transaction_id']
-        transaction_inputs=data['transaction_inputs']
-        transaction_outputs=data['transaction_outputs']
-        signature=data['signature']
-
-        
-        # correct datatypes
-        inputs=[]
-        for item in transaction_inputs:
-            input=(tuple(item))
-            inputs.append(input)
-            
-        outputs=[]
-        for item in transaction_outputs:
-            # print(item)
-            # temp=item[1:-1].split(',')
-            # temp=tuple(temp)
-            # output=(temp[0][1:-1],int(temp[1]))
-            output=tuple(item)
-            outputs.append(output)
-
-        
-        # create transaction object
-        trans=Transaction(sender_address,None,receiver_address,amount)
-        trans.transaction_id=transaction_id
-        trans.inputs=inputs
-        trans.outputs=outputs
-        trans.signature=signature
+        trans=process_transaction(data)
+        if trans==None:
+            return {'message': "Error in receiving transaction"}, 400
         print("received transaction")
         try:
             is_valid=node_instance.validate_transaction(trans)
@@ -115,13 +150,60 @@ def receive_ring():
     data=request.get_json()
     
     try:
-        # get trasnaction data
+        # get data
         
         node_instance.ring=data['ring']
         node_instance.node_number=len(node_instance.ring)
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving ring"}, 400
+
+@app.route('/blockchain/get', methods=['POST'])
+def receive_blockchain():
+    print('receive blockchain endpoint')
+    data=request.get_json()
+    try:
+        for i in range(0,len(data)):
+            block_to_get=data[i]
+            processed_block=process_block(block_to_get)
+            if (i!=0):                                                  # genesis block is not validated              
+                if not node_instance.validate_block(processed_block):   # block not valid, this and all following will not be added to blockchain
+                    print('found block not valid in blockchain')
+                    return {'message': 'Blockchain received'}, 200
+            node_instance.chain.append(processed_block)                 # block valid, add to blockchain
+            return {'message': 'Blockchain received'}, 200
+    except:
+        return {'message': 'Error in receiving blockchain'}, 400
+
+
+@app.route('/blocks/receive', methods=['POST'])
+def receive_block():
+    print('receive block endpoint')
+    data=request.get_json()
+   # print('data received',data)
+    try:
+        # get block data
+        
+        new_block=process_block(data)
+        if new_block==None:
+            print('new block is none')
+            return {'message': "Error in receiving block"}, 400        
+
+        # validate block
+        print('time to validate block')
+        if node_instance.validate_block(new_block):
+            print('block hash valid')
+            node_instance.chain.append(new_block)        # block is valid, add to blockchain
+        else:
+            print('block hash not valid')
+            # should call resolve confict
+
+        return {'message': "Received"}, 200
+            
+    except e:
+        print(e)
+        return {'message': "Error in receiving block"}, 400
+        
 
 
 #run it once for every node
@@ -134,7 +216,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     port = args.port
    
-    node_instance=Node()
+    
 
     second_thread = threading.Thread(target=initial())
     second_thread.start()
