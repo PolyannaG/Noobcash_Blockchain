@@ -1,10 +1,7 @@
 from ast import excepthandler
 from binascii import a2b_hex
 import binascii
-from cProfile import run
-from inspect import signature
-from platform import node
-
+from msvcrt import locking
 from dotenv import load_dotenv
 from block import Block
 from wallet import wallet
@@ -16,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 import time
 import os
-
+import uuid
+import copy
 import Crypto
 import Crypto.Random
 from Crypto.Hash import SHA
@@ -27,6 +25,14 @@ class Node:
 	def __init__(self):
 		#self.NBC=100;
 		##set
+
+		NBCs_lock=threading.Lock()
+		valid_transactions_lock=threading.Lock()
+		cur_block_lock=threading.Lock()
+		chain_lock=threading.Lock()
+		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock}
+
+		self.valid_transaction_ids=set()
 
 		self.block_capacity=2
 
@@ -75,10 +81,13 @@ class Node:
 		#remember to broadcast it
 		
 		#logic missing!  broadcast !!!!
-		if (sender=='0'):																			  # transaction for genesis block	
+		if (sender=='0'):
+			#print('hereeeeeeee')	
+			print(amount)																		  # transaction for genesis block	
 			new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
 			new_transaction.transaction_inputs=[]
-			new_transaction.transaction_outputs=[(receiver,amount)]
+			#new_transaction.transaction_outputs=[(receiver,amount)]
+			new_transaction.outputs=[(str(uuid.uuid1()),new_transaction.transaction_id,binascii.b2a_hex(receiver).decode('utf-8'),amount)]
 			new_transaction.sign_transaction()
 			
 			return 'Transaction created succesfully', 200, new_transaction
@@ -89,33 +98,38 @@ class Node:
 			for node_item in self.ring:																  # check that node is indeed part of the ring
 				if (node_item['address']==sender):
 					sender_id=node_item['node_id']
+			print(sender_id)
 			if sender_id==None:						
 				return "Sender not part of ring." ,400, None
 			elif sender_id!=self.id:																  # check that the node is indeed the current one (for safety, should always be true)
 				return "Sender not current node, you do not own this wallet.", 400, None
 			else:
-				total=self.wallet.balance(self.NBCs[sender_id])										  # check that the node has enough NBCs for the transaction	
+				self.locks['NBCs'].acquire()
+				total=self.wallet.balance(self.NBCs[sender_id])	
+				print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
 				if (total<amount):
 					return "Not enough NBCs for the spesified transaction.", 400, None
 				else:                                                                                 # all checks complete, we are ready to start the transaction
 					try:
+						print('heloooo')
 
 						inputs=[]
 						outputs=[]																		
 						cur_sum=0
 						
 						for item in self.NBCs[sender_id]:											  # find the previous transactions the money will come from
-							cur_sum+=item[1]
+							cur_sum+=item[3]
 							inputs.append(item)
 							if cur_sum>=amount:
 								break
-						
+						self.locks['NBCs'].release()
 						difference=cur_sum-amount													  # calculate how much money the sender has to get back				
-						if (difference!=0):
-							outputs.append((sender,difference))
-						outputs.append((receiver,amount))                                             # the money to be given to receiver
-						
 						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
+						if (difference!=0):
+							outputs.append((str(uuid.uuid1()),new_transaction.transaction_id,sender,difference))
+						outputs.append((str(uuid.uuid1()),new_transaction.transaction_id,receiver,amount))                                             # the money to be given to receiver
+						
+						
 						new_transaction.inputs=inputs                                                 # add the trasaction inputs
 						new_transaction.outputs=outputs          		              	              # add the transaction outputs	
 						new_transaction.sign_transaction()											  # sign transaction	
@@ -123,7 +137,7 @@ class Node:
 						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
 						#threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
 						#broadcast_thread.start()    
-						                           
+						print(new_transaction)  
 						return "Transaction created successfully", 200 , new_transaction
 					except:                                                                           # Case of unexpected error
 						return "Error creating transaction.", 500, None
@@ -163,13 +177,20 @@ class Node:
 
 
 
-	async def broadcast_transaction(self,transaction):
+	async def broadcast_transaction(self,transaction,to_all=True):
 		trans_to_broadcast=transaction.to_dict(True)
 		#print(trans_to_broadcast)
-		for node_ in self.ring:
-			#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
+		if to_all:
+			for node_ in self.ring:
+				#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
+				sent_thread=threading.Thread(target=self.transaction_sending,args=(node_,trans_to_broadcast))
+				sent_thread.start()
+		else:
+			node_=self.ring[0]
+				#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
 			sent_thread=threading.Thread(target=self.transaction_sending,args=(node_,trans_to_broadcast))
 			sent_thread.start()
+
 
 			
 						
@@ -199,31 +220,36 @@ class Node:
 					if transaction.sender_address==item['address']:
 						sender_id=item['node_id']
 						print('found sender in ring',sender_id)
+				self.locks['NBCs'].acquire()
 				for input in transaction.inputs:                     # check that every input is unspent
 					found_utxo=False
-					print(self.NBCs)
-
-					for utxo in self.NBCs[sender_id]:           
+					for utxo in self.NBCs[sender_id]:          
 						if utxo[0]==input[0]:
 							found_utxo=True
 							self.NBCs[sender_id].remove(utxo)
 					if not found_utxo:
 						print('utxo not unspent')
+						self.locks['NBCs'].release()
 						return False
 				
 			# add transaction outputs to UTXOs list (NBCs)
 				
 				for output in transaction.outputs:                 # inputs unspent, time to add outputs to NBCs list
 					for item in self.ring:                         # find id of node whose wallter will get the NBCs
-						if output[0]==item['address']:
+						if output[2]==item['address']:
 							print('found node id',item['node_id'])
 							node_id=item['node_id']
 					if node_id==None:
 						print('Node id not found in ring')
+						self.locks['NBCs'].release()
 						return False
-					self.NBCs[node_id].append((transaction.transaction_id,output[1]))
-					print('new nbcs:', self.NBCs)
-			
+					if output not in self.NBCs[node_id]:
+						self.NBCs[node_id].append(output)
+					#print('new nbcs:', self.NBCs)
+				self.locks['NBCs'].release()
+			self.locks['valid_trans'].acquire()
+			self.valid_transaction_ids.add(transaction.transaction_id)
+			self.locks['valid_trans'].release()
 			return True                                         
 		except:
 			return False
@@ -232,8 +258,10 @@ class Node:
 
 	async def send_blockchain(self):							     # function for bootstrap to send blockchain_to_nodes
 		block_list=[]
+		self.locks['chain'].acquire()
 		for i in range(0,len(self.chain)):					 # create list of blocks in sendable form
 			block_list.append(self.chain[i].to_dict(True))
+		self.locks['chain'].release()
 		data=block_list
 		num=[0]						   						# variable to hold how many nodes have received the ring
 		for node_ in self.ring[1:]:       					    # send ring to all nodes in ring
@@ -255,13 +283,13 @@ class Node:
 							print("all nodes have received blockchain")
 
 							message,error_code,trans=self.create_transaction(self.wallet.address,self.ring[-1]['address'],100)
-							#threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+							threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(trans,False),)).start()
 							
 							if error_code!=200:
 								return message, error_code
 							print('after creation')
 
-							self.add_transaction_to_block(trans)
+							#self.add_transaction_to_block(trans)
 
 
 					else:                                                                   # error in sending
@@ -325,27 +353,31 @@ class Node:
 
 	def add_transaction_to_block(self,transaction):
 		#if enough transactions  mine
+		self.locks['cur_block'].acquire()
 		if self.current_block==None:
 			print("creating new block",transaction)
+			self.locks['chain'].acquire()
 			if self.chain==[]:                                            # case of genesis block
 				self.current_block=self.create_new_block(0,1,None,1)
 			elif len(self.chain)==1:									  # case of initial transactions from bootstrap, they will be a block	
 				self.current_block=self.create_new_block(self.chain[-1].index+1, self.chain[-1].hash, None, self.node_number-1)
 			else:
 				self.current_block=self.create_new_block(self.chain[-1].index+1, self.chain[-1].hash, None, self.block_capacity)  # usual case, create next current block following the last of the blockchain
-
+			self.locks['chain'].release()
 		self.current_block.listOfTransactions.append(transaction)
 		if len(self.current_block.listOfTransactions)==self.current_block.capacity:
 			print("block is full")
 			#t=threading.Thread(target=asyncio.run, args=(self.mine_block(self.current_block),))
 			#threading.Thread(target=asyncio.run,args=(self.mine_block(self.current_block),)).start()
 			try:
-				t=threading.Thread(target=asyncio.run, args=(self.mine_block(self.current_block),))
+				t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
 				t.start()
 			except Exception as e:
 				print(e)
+				self.locks['cur_block'].release()
 				return
 			self.current_block=None
+		self.locks['cur_block'].release()
 		return
 
 
@@ -359,21 +391,30 @@ class Node:
 			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
 			
 			# check that transactions have not already been included to blockchain by a different node
+			self.locks['chain'].acquire()
+			print(self.chain)
 			if self.chain!=[] and self.chain[-1].index>=block_to_mine.index: 					# check if new block has been added
+				print('CASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE')
 				for block_item in self.chain[block_to_mine.index:]:			# for all new added blocks
 					for trans in block_item.listOfTransactions:				# for all transactions of the blocks
-						for i in range(0,len(block_to_mine.listOfTranscations)):	# check if they exist in the block beeing mined
+						i=0
+						while(i<len(block_to_mine.listOfTransactions)):
+						# check if they exist in the block beeing mined
 							if trans.transaction_id==block_to_mine.listOfTransactions[i].transaction_id:
 								block_to_mine.listOfTransactions.pop(i)             # if yes, remove them from block being mined
+								i-=1
 								if len(block_to_mine.listOfTransactions)==0:		# if no more transactions in block, stop mining
 									print("stoping block mining, all transactions already mined")
+									self.locks['chain'].release()
 									return	
 								else:												# otherwise mining will continue
 									block_to_mine.index=self.chain[-1].index+1      # correct block index
 									block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
-									block_to_mine.nonce=0							# restart nonce															
+									block_to_mine.nonce=0							# restart nonce		
+							i+=1
+																					
 									
-
+			self.locks['chain'].release()
 		print('block mined')
 
 		# mining finished, time to broadcast block to all nodes (if we already have a completed ring)
@@ -381,9 +422,10 @@ class Node:
 		# if ring is not completed we are at initialization stage (bootstrap node), block straight to blockchain
 		if len(self.ring)<self.node_number:
 			print("nodes not here yet, no block broadcast")
+			self.locks['chain'].acquire()
 			self.chain.append(block_to_mine)                                           # add block straight to chain, it will be shared with the nodes later
 																					   # should the chain object the Blockchain or a list?
-
+			self.locks['chain'].release()
 		# otherwise, all nodes are in the ring: normal case, mined block has to be broadcasted
 		if len(self.ring)==self.node_number:
 			print("all nodes here, normal case")
@@ -426,6 +468,14 @@ class Node:
 			#should check previous hash here
 			print(self.chain)
 			print('hash ok')
+			for trans in block.listOfTransactions:
+				if trans.transaction_id not in self.valid_transaction_ids:
+					if self.validate_transaction(trans):
+						print('valid trans')
+					else:
+						print('not valid trans')
+				else:
+					print('transaction already validated')
 			return True
 		else:
 			print('hash not ok')

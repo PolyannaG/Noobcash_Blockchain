@@ -34,7 +34,7 @@ class wallet:
 	def balance(self,NBCs_list):										   # parameter is list of unsent UTXOs, returns total NBCs
 		total=0
 		for item in NBCs_list:                                             # sum all the UTXOs of the node
-			total+=item[1]
+			total+=item[3]
 		return total
 
 #wall=wallet()

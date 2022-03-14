@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 import argparse
 import sys
 import os
+import asyncio
 
 
 import block
@@ -120,6 +121,41 @@ def get_transactions():
     response = {'transactions': transactions}
     print(transactions)
     return jsonify(response), 200
+@app.route('/NBCs/print',methods=['GET'])
+def print_nbcs():
+    response=node_instance.NBCs
+    return jsonify(response), 200
+@app.route('/blockchain/print',methods=['GET'])
+def print_blockhain():
+    response=[]
+    for item in node_instance.chain:
+        response.append(item.to_dict(True))
+    return jsonify(response),200
+
+@app.route('/transactions/create',methods=['POST'])
+def create_transaction():
+    data=request.get_json()
+    
+    try:
+        id=data['id']
+        amount=data['amount']
+        for node_ in node_instance.ring:
+            if node_['node_id']==id:
+                print('receiver node address found')
+                receiver_address=node_['address']
+                print(node_instance.wallet.public_key,receiver_address)
+                message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+                if error_code!=200:
+                        return message, error_code
+                threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                break
+        else:
+            print('node address not fount')
+            return {'message': 'Error creating transaction'}, 404
+        return {'message': 'Created transaction'},200
+    except:
+        return {'message': 'Error creating transaction'}, 404
+
 
 @app.route('/transactions/receive', methods=['POST'])
 def receive_transaction():
@@ -137,6 +173,7 @@ def receive_transaction():
                 print('not valid transaction')
             else:
                 print("valid transaction")
+                node_instance.add_transaction_to_block(trans)
         except:
             print("not valid transaction")
         return {'message': "Received"}, 200
@@ -154,6 +191,8 @@ def receive_ring():
         
         node_instance.ring=data['ring']
         node_instance.node_number=len(node_instance.ring)
+        for i in range(0,node_instance.node_number):
+            node_instance.NBCs[i]=[]
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving ring"}, 400
@@ -164,12 +203,30 @@ def receive_blockchain():
     data=request.get_json()
     try:
         for i in range(0,len(data)):
+            #print(i)
             block_to_get=data[i]
             processed_block=process_block(block_to_get)
             if (i!=0):                                                  # genesis block is not validated              
                 if not node_instance.validate_block(processed_block):   # block not valid, this and all following will not be added to blockchain
                     print('found block not valid in blockchain')
                     return {'message': 'Blockchain received'}, 200
+            else:
+                #print('here', processed_block.listOfTransactions[0].outputs)
+                for item in processed_block.listOfTransactions:
+                    try:
+                        for output in item.outputs:                 # inputs unspent, time to add outputs to NBCs list
+                            #print(node_instance.ring)
+                            for item in node_instance.ring:                         # find id of node whose wallter will get the NBCs
+                                if output[2]==item['address']:
+                                    print('found node id',item['node_id'])
+                                    node_id=item['node_id']
+                            if node_id==None:
+                                print('Node id not found in ring')
+                                return False
+                            if output not in node_instance.NBCs[node_id]:
+                                node_instance.NBCs[node_id].append(output)
+                    except e:
+                        print(e)
             node_instance.chain.append(processed_block)                 # block valid, add to blockchain
             return {'message': 'Blockchain received'}, 200
     except:
@@ -194,6 +251,8 @@ def receive_block():
         if node_instance.validate_block(new_block):
             print('block hash valid')
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
+            #print(node_instance.chain)
+            #print(node_instance.NBCs)
         else:
             print('block hash not valid')
             # should call resolve confict
