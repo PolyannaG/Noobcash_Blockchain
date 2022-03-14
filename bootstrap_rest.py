@@ -138,8 +138,14 @@ def print_blockhain():
     for item in node_instance.chain:
         response.append(item.to_dict(True))
     return jsonify(response),200
+@app.route('/ring/print',methods=['GET'])
+def print_ring():
+    return jsonify(node_instance.ring),200
 
-
+@app.route('/blockchain/length',methods=['GET'])
+def get_blockhain_length():
+    response={'length': len(node_instance.chain)}
+    return jsonify(response),200
 
 @app.route('/register',methods=['POST'])
 def register_node():

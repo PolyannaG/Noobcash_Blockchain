@@ -2,6 +2,7 @@ from ast import excepthandler
 from binascii import a2b_hex
 import binascii
 from msvcrt import locking
+import random
 from dotenv import load_dotenv
 from block import Block
 from wallet import wallet
@@ -385,9 +386,11 @@ class Node:
 
 		# start mining
 		print("mining block")
-		block_to_mine.nonce=0															# set initial nonce
+		#block_to_mine.nonce=0	
+		block_to_mine.nonce=random.randint(0,10000000000000)														# set initial nonce
 		while not block_to_mine.myHash().startswith('0'*block_to_mine.difficulty):      # keep trying hashing with a different once until number of zeros specified is reached
-			block_to_mine.nonce+=1													
+			#block_to_mine.nonce+=1	
+			block_to_mine.nonce=random.randint(0,10000000000000)									
 			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
 			
 			# check that transactions have not already been included to blockchain by a different node
@@ -410,7 +413,8 @@ class Node:
 								else:												# otherwise mining will continue
 									block_to_mine.index=self.chain[-1].index+1      # correct block index
 									block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
-									block_to_mine.nonce=0							# restart nonce		
+									#block_to_mine.nonce=0							# restart nonce		
+									block_to_mine.nonce=random.randint(0,10000000000000)
 							i+=1
 																					
 									
@@ -458,7 +462,9 @@ class Node:
 		return
 
 
-
+	def update_ring_amounts(self):
+		for i in range(0,len(self.ring)):
+			self.ring[i]['balance']=self.wallet.balance(self.NBCs[i])
 
 	def validate_block(self,block):
 		#print(block.listOfTransactions)
@@ -476,9 +482,11 @@ class Node:
 						print('not valid trans')
 				else:
 					print('transaction already validated')
+			self.update_ring_amounts()
 			return True
 		else:
 			print('hash not ok')
+			threading.Thread(target=asyncio.run, args=(self.resolve_conflicts(),)).start()
 			return False
    
 		
@@ -492,10 +500,35 @@ class Node:
 
 	def valid_chain(self, chain):
 		#check for the longer chain accroose all nodes
-		return
+		for block in chain:
+			if self.validate_block(block):
+				print('block valid')
+			else:
+				print('block not valid')
+				return False
+		return True
 
 	def resolve_conflicts(self):
 		#resolve correct chain
+		lengths=[]
+		for node_ in self.ring:
+			res=requests.get(node_['contact']+'/blockchain/length')
+			if res.status_code==200:
+				res=res.json()
+				print(res)
+				lengths.append((node_['node_id'],res['length']))
+		max_len=0
+		max_id=0
+		for item in lengths:
+			if item[1]>max_len:
+				max_len=item[1]
+				max_id=item[0]
+		if max_id!=self.id:
+			print('new blockchain to be adopted')
+			# here wee should call the node to give us its blockchain!!!!!!!!!!!
+			# there are some issues: 
+			# should we ask for the whole blockchain?
+			# how will the NBCs be adapted? 
+			# one solution is to get whole blockchain and NBCs or to not get NBCs and calculate everything from the blockchain, but this is not very efficient!
 		return
-
 
