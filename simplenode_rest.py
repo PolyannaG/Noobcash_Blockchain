@@ -114,6 +114,47 @@ def process_block(data):
 
 # get all transactions in the blockchain
 
+@app.route('/file_transactions', methods=['GET'])
+def read_file_trans():
+    file1 = open('transactions1.txt', 'r')
+    count = 0
+    
+    while True:
+        count += 1
+    
+        # Get next line from file
+        line = file1.readline()
+    
+        # if line is empty
+        # end of file is reached
+        if not line:
+            break
+        line=line.strip()
+        id=line.split()[0]
+        id=int(id[2:])-1
+        if id>node_instance.node_number:
+            id=0
+        amount=int(line.split()[1])
+        try:
+        
+            for node_ in node_instance.ring:
+                if node_['node_id']==id:
+                    print('receiver node address found')
+                    receiver_address=node_['address']
+                    print(node_instance.wallet.public_key,receiver_address)
+                    message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+                    if error_code!=200:
+                            print('error creating trans')
+                            continue
+                    threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                    break
+        except:
+            print('error2 creating trans')
+            continue
+    
+    file1.close()
+    return jsonify({}),200
+
 @app.route('/transactions/get', methods=['GET'])
 def get_transactions():
     
@@ -161,7 +202,7 @@ def create_transaction():
             if node_['node_id']==id:
                 print('receiver node address found')
                 receiver_address=node_['address']
-                print(node_instance.wallet.public_key,receiver_address)
+                #print(node_instance.wallet.public_key,receiver_address)
                 message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
                 if error_code!=200:
                         return message, error_code

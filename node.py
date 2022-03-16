@@ -85,7 +85,7 @@ class Node:
 		#logic missing!  broadcast !!!!
 		if (sender=='0'):
 			#print('hereeeeeeee')	
-			print(amount)																		  # transaction for genesis block	
+			#print(amount)																		  # transaction for genesis block	
 			new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)
 			new_transaction.transaction_inputs=[]
 			#new_transaction.transaction_outputs=[(receiver,amount)]
@@ -100,7 +100,7 @@ class Node:
 			for node_item in self.ring:																  # check that node is indeed part of the ring
 				if (node_item['address']==sender):
 					sender_id=node_item['node_id']
-			print(sender_id)
+			#print(sender_id)
 			if sender_id==None:						
 				return "Sender not part of ring." ,400, None
 			elif sender_id!=self.id:																  # check that the node is indeed the current one (for safety, should always be true)
@@ -108,7 +108,7 @@ class Node:
 			else:
 				self.locks['NBCs'].acquire()
 				total=self.wallet.balance(self.NBCs[sender_id])	
-				print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
+				#print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
 				if (total<amount):
 					return "Not enough NBCs for the spesified transaction.", 400, None
 				else:                                                                                 # all checks complete, we are ready to start the transaction
@@ -139,9 +139,10 @@ class Node:
 						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
 						#threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
 						#broadcast_thread.start()    
-						print(new_transaction)  
+						#print(new_transaction)  
 						return "Transaction created successfully", 200 , new_transaction
-					except:                                                                           # Case of unexpected error
+					except:  
+						self.locks['NBCs'].release()                                                                         # Case of unexpected error
 						return "Error creating transaction.", 500, None
 
 
@@ -401,27 +402,34 @@ class Node:
 			
 			# check that transactions have not already been included to blockchain by a different node
 			self.locks['chain'].acquire()
-			print(self.chain)
+			#print(self.chain)
 			if self.chain!=[] and self.chain[-1].index>=block_to_mine.index: 					# check if new block has been added
 				print('CASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE')
+				print(self.chain[-1].index,block_to_mine.index)
 				for block_item in self.chain[block_to_mine.index:]:			# for all new added blocks
 					for trans in block_item.listOfTransactions:				# for all transactions of the blocks
 						i=0
 						while(i<len(block_to_mine.listOfTransactions)):
 						# check if they exist in the block beeing mined
 							if trans.transaction_id==block_to_mine.listOfTransactions[i].transaction_id:
+								print('popping')
 								block_to_mine.listOfTransactions.pop(i)             # if yes, remove them from block being mined
 								i-=1
 								if len(block_to_mine.listOfTransactions)==0:		# if no more transactions in block, stop mining
 									print("stoping block mining, all transactions already mined")
 									self.locks['chain'].release()
 									return	
-								else:												# otherwise mining will continue
-									block_to_mine.index=self.chain[-1].index+1      # correct block index
-									block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
-									#block_to_mine.nonce=0							# restart nonce		
-									block_to_mine.nonce=random.randint(0,10000000000000)
+								# else:												# otherwise mining will continue
+								# 	block_to_mine.index=self.chain[-1].index+1      # correct block index
+								# 	block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
+								# 	#block_to_mine.nonce=0							# restart nonce		
+								# 	block_to_mine.nonce=random.randint(0,10000000000000)
 							i+=1
+			
+				block_to_mine.index=self.chain[-1].index+1      # correct block index
+				block_to_mine.previousHash=self.chain[-1].hash  # correct previous hash
+				#block_to_mine.nonce=0							# restart nonce		
+				block_to_mine.nonce=random.randint(0,10000000000000)
 																					
 									
 			self.locks['chain'].release()
@@ -629,6 +637,7 @@ class Node:
 				self.locks['valid_trans'].release()
 				self.resolve_conflicts()
 				return
+			self.update_ring_amounts()
 			self.locks['chain'].release()
 			self.locks['cur_block'].release()
 			self.locks['NBCs'].release()
