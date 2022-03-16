@@ -147,6 +147,11 @@ def get_blockhain_length():
     response={'length': len(node_instance.chain)}
     return jsonify(response),200
 
+@app.route('/blockchain/get', methods=['GET'])
+def send_blockchain():
+    response={'chain': node_instance.send_blockchain_resolve_conflict()}
+    return jsonify(response),200
+
 @app.route('/register',methods=['POST'])
 def register_node():
     if (node_instance.current_id_count==node_number-1):   # check if we already have n nodes

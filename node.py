@@ -1,6 +1,7 @@
 from ast import excepthandler
 from binascii import a2b_hex
 import binascii
+from cmath import e
 from msvcrt import locking
 import random
 from dotenv import load_dotenv
@@ -197,7 +198,7 @@ class Node:
 						
 
 
-	def validate_transaction(self,transaction):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
+	def validate_transaction(self,transaction,from_resolve_conflict=False):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
 		#use of signature and NBCs balance
 		print('validating')		
 		sender_address=a2b_hex(transaction.sender_address)
@@ -221,7 +222,8 @@ class Node:
 					if transaction.sender_address==item['address']:
 						sender_id=item['node_id']
 						print('found sender in ring',sender_id)
-				self.locks['NBCs'].acquire()
+				if not from_resolve_conflict:
+					self.locks['NBCs'].acquire()
 				for input in transaction.inputs:                     # check that every input is unspent
 					found_utxo=False
 					for utxo in self.NBCs[sender_id]:          
@@ -230,7 +232,8 @@ class Node:
 							self.NBCs[sender_id].remove(utxo)
 					if not found_utxo:
 						print('utxo not unspent')
-						self.locks['NBCs'].release()
+						if not from_resolve_conflict:
+							self.locks['NBCs'].release()
 						return False
 				
 			# add transaction outputs to UTXOs list (NBCs)
@@ -247,10 +250,13 @@ class Node:
 					if output not in self.NBCs[node_id]:
 						self.NBCs[node_id].append(output)
 					#print('new nbcs:', self.NBCs)
-				self.locks['NBCs'].release()
-			self.locks['valid_trans'].acquire()
+				if not from_resolve_conflict:
+					self.locks['NBCs'].release()
+			if not from_resolve_conflict:
+				self.locks['valid_trans'].acquire()
 			self.valid_transaction_ids.add(transaction.transaction_id)
-			self.locks['valid_trans'].release()
+			if not from_resolve_conflict:
+				self.locks['valid_trans'].release()
 			return True                                         
 		except:
 			return False
@@ -466,23 +472,39 @@ class Node:
 		for i in range(0,len(self.ring)):
 			self.ring[i]['balance']=self.wallet.balance(self.NBCs[i])
 
-	def validate_block(self,block):
+	def validate_block(self,block,from_resolve_coflict=False):
 		#print(block.listOfTransactions)
 		load_dotenv()
 		#print(os.getenv('DIFFICULTY'))
 		if block.myHash().startswith('0'*int(os.getenv('DIFFICULTY'))):  # check that block hash is correct
 			#should check previous hash here
-			print(self.chain)
+			#print(self.chain)
 			print('hash ok')
+			if not from_resolve_coflict:
+				self.locks['chain'].acquire()
+			if len(self.chain)>=1 and block.previousHash!=self.chain[-1].hash:
+				print('errrrrrrrrrrrrrrrrrrrrrrrrrrror')
+				#threading.Thread(target=asyncio.run, args=(self.resolve_conflicts(),)).start()
+				
+				if not from_resolve_coflict:
+					self.locks['chain'].release()
+				self.resolve_conflicts()
+				return False
+			else:
+				if not from_resolve_coflict:
+					self.locks['chain'].release()
+
 			for trans in block.listOfTransactions:
 				if trans.transaction_id not in self.valid_transaction_ids:
-					if self.validate_transaction(trans):
+					if self.validate_transaction(trans,from_resolve_coflict):
 						print('valid trans')
 					else:
 						print('not valid trans')
 				else:
 					print('transaction already validated')
 			self.update_ring_amounts()
+			#if not from_resolve_coflict:
+				#self.locks['chain'].release()
 			return True
 		else:
 			print('hash not ok')
@@ -515,20 +537,168 @@ class Node:
 			res=requests.get(node_['contact']+'/blockchain/length')
 			if res.status_code==200:
 				res=res.json()
-				print(res)
-				lengths.append((node_['node_id'],res['length']))
+				lengths.append((node_['contact'],res['length']))
 		max_len=0
-		max_id=0
+		max_node=0
 		for item in lengths:
 			if item[1]>max_len:
 				max_len=item[1]
-				max_id=item[0]
-		if max_id!=self.id:
+				max_node=item[0]
+		if max_node!=self.ring[self.id]['contact']:
 			print('new blockchain to be adopted')
 			# here wee should call the node to give us its blockchain!!!!!!!!!!!
 			# there are some issues: 
 			# should we ask for the whole blockchain?
 			# how will the NBCs be adapted? 
 			# one solution is to get whole blockchain and NBCs or to not get NBCs and calculate everything from the blockchain, but this is not very efficient!
+			
+			
+			while True:
+				print('sending request to',max_node)
+				res=requests.get(max_node+'/blockchain/get')
+				if res.status_code==200:
+					res=res.json()
+					break
+			try:
+				print('acquiring locks')
+				self.locks['chain'].acquire()
+				print('aq0')
+				self.locks['cur_block'].acquire()
+				print('aq1')
+				self.locks['NBCs'].acquire()
+				print('aq2')
+				self.locks['valid_trans'].acquire()
+				print('aquired locks')
+				chain=res['chain']
+				self.chain=[]
+				self.NBCs={}
+				for i in range(0,len(self.ring)):
+					self.NBCs[i]=[]
+				self.valid_transaction_ids=set()
+				self.current_block=None
+				for i in range(0,len(chain)):
+					print('process block:', i)
+					processed_block=self.process_block(chain[i])
+					if i==0:
+						for item in processed_block.listOfTransactions:
+							try:
+								for output in item.outputs:                 # inputs unspent, time to add outputs to NBCs list
+									
+									#print(node_instance.ring)
+									for item in self.ring:                         # find id of node whose wallter will get the NBCs
+										if output[2]==item['address']:
+											print('found node id',item['node_id'])
+											node_id=item['node_id']
+									if node_id==None:
+										print('Node id not found in ring')
+										self.locks['chain'].release()
+										self.locks['cur_block'].release()
+										self.locks['NBCs'].release()
+										self.locks['valid_trans'].release()
+										self.resolve_conflicts()
+										return
+									if output not in self.NBCs[node_id]:
+										self.NBCs[node_id].append(output)
+							except :
+								print('error in first block')
+								self.locks['chain'].release()
+								self.locks['cur_block'].release()
+								self.locks['NBCs'].release()
+								self.locks['valid_trans'].release()
+								print('error in genesis block')
+								self.resolve_conflicts()
+								return 
+					else:
+						if not self.validate_block(processed_block,True):   # block not valid, this and all following will not be added to blockchain
+							print('found block not valid in blockchain')
+							self.locks['chain'].release()
+							self.locks['cur_block'].release()
+							self.locks['NBCs'].release()
+							self.locks['valid_trans'].release()
+							print('error in block: ',i)
+							self.resolve_conflicts()
+							return
+					self.chain.append(processed_block)
+		            		      
+			except e:
+				print(e)
+				print('error in resolve conficts')
+				self.locks['chain'].release()
+				self.locks['cur_block'].release()
+				self.locks['NBCs'].release()
+				self.locks['valid_trans'].release()
+				self.resolve_conflicts()
+				return
+			self.locks['chain'].release()
+			self.locks['cur_block'].release()
+			self.locks['NBCs'].release()
+			self.locks['valid_trans'].release()		
 		return
+
+
+	def process_transaction(self,item):
+		try:
+			sender_address=item['sender_address']
+			receiver_address=item['receiver_address']
+			amount=item['amount']
+			transaction_id=item['transaction_id']
+			transaction_inputs=item['transaction_inputs']
+			transaction_outputs=item['transaction_outputs']
+			signature=item['signature']
+			
+			# correct datatypes
+			inputs=[]
+			for item in transaction_inputs:
+				input=(tuple(item))
+				inputs.append(input)
+				
+			outputs=[]
+			for item in transaction_outputs:
+				output=tuple(item)
+				outputs.append(output)
+
+			
+			# create transaction object
+			trans=Transaction(sender_address,None,receiver_address,amount)
+			trans.transaction_id=transaction_id
+			trans.inputs=inputs
+			trans.outputs=outputs
+			trans.signature=signature
+
+			return trans
+		except:
+			return None
+
+	def process_block(self,data):
+		try:
+			previous_hash=data['previous_hash']
+			index=data['index']
+			timestamp=data['timestamp']
+			list_of_transactions=data['list_of_transactions']
+			nonce=data['nonce']
+			hash=data['hash']
+			capacity=data['capacity']
+
+			proccessed_transaction_list=[]                              # list to add all transactions of block in object form
+			for item in list_of_transactions:                           # convert all transaction objects back to object form                
+				trans=self.process_transaction(item)
+				if trans==None:
+					return {'message': "Error in receiving block"}, 400
+				proccessed_transaction_list.append(trans)
+			new_block=self.create_new_block(index,previous_hash,nonce,capacity)
+			new_block.timestamp=timestamp
+			new_block.hash=hash
+			new_block.listOfTransactions=proccessed_transaction_list
+			return new_block
+		except:
+			return None
+
+	def send_blockchain_resolve_conflict(self):               # function to send blockchain_to_node
+		block_list=[]
+		self.locks['chain'].acquire()
+		for i in range(0,len(self.chain)):					 # create list of blocks in sendable form
+			block_list.append(self.chain[i].to_dict(True))
+		self.locks['chain'].release()
+		return block_list
+
 

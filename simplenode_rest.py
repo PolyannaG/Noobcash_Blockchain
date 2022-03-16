@@ -140,6 +140,11 @@ def get_blockhain_length():
     response={'length': len(node_instance.chain)}
     return jsonify(response),200
 
+@app.route('/blockchain/get', methods=['GET'])
+def send_blockchain():
+    response={'chain': node_instance.send_blockchain_resolve_conflict()}
+    return jsonify(response),200
+
 @app.route('/resolve_confict',methods=['GET'])
 def temp():
     node_instance.resolve_conflicts()
