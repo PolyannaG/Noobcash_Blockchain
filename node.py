@@ -233,9 +233,9 @@ class Node:
 							self.NBCs[sender_id].remove(utxo)
 					if not found_utxo:
 						print('utxo not unspent')
-						if not from_resolve_conflict:
-							self.locks['NBCs'].release()
-						return False
+						# if not from_resolve_conflict:
+						# 	self.locks['NBCs'].release()
+						# return False
 				
 			# add transaction outputs to UTXOs list (NBCs)
 				

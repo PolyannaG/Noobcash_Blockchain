@@ -174,6 +174,7 @@ def print_blockhain():
     return jsonify(response),200
 @app.route('/ring/print',methods=['GET'])
 def print_ring():
+    node_instance.update_ring_amounts()
     return jsonify(node_instance.ring),200
 
 @app.route('/blockchain/length',methods=['GET'])
