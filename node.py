@@ -4,6 +4,7 @@ import binascii
 from cmath import e
 from msvcrt import locking
 from platform import node
+from queue import Empty
 import random
 import sys
 from dotenv import load_dotenv
@@ -36,10 +37,9 @@ class Node:
 		chain_lock=threading.Lock()
 		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock}
 
-		self.valid_transaction_ids=set()
 
 		self.block_capacity=2
-		self.myNBCs=[]
+		
 		
 		self.chain=[]
 		self.current_id_count=0
@@ -54,8 +54,10 @@ class Node:
 		self.wallet=self.create_wallet()  # wallet will be created by create_wallet() --> should we call it here??  
 		self.ring=[]    #here we store information for every node, as its id, its address (ip:port) its public key and its balance
 		self.current_block=None 
-		self.block_to_mine=[]
-		self.mining=False
+		
+		self.pending_transaction_ids=set()
+		self.used_nbcs=set()
+		
 		print("creating new node instance")
 
 
@@ -84,6 +86,12 @@ class Node:
 			return False
 
 
+	def sleeper(self):
+		print("sleeping")
+		time.sleep(2)
+		
+		return
+
 	def create_transaction(self,sender, receiver,amount, signature=None):
 		#remember to broadcast it
 		
@@ -97,7 +105,7 @@ class Node:
 			new_transaction.outputs=[(str(uuid.uuid1()),new_transaction.transaction_id,binascii.b2a_hex(receiver).decode('utf-8'),amount)]
 			new_transaction.sign_transaction()
 			
-			self.myNBCs.append(new_transaction.outputs[0])
+			
 
 			return 'Transaction created succesfully', 200, new_transaction
 		
@@ -114,63 +122,115 @@ class Node:
 				return "Sender not current node, you do not own this wallet.", 400, None
 			else:
 				self.locks['NBCs'].acquire()
-				total=self.wallet.balance(self.myNBCs)	
-				#print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
-				if (total<amount):
-					self.locks['NBCs'].release()
-					return "Not enough NBCs for the spesified transaction.", 400, None
-				else:                                                                                 # all checks complete, we are ready to start the transaction
-					try:
-						#print('heloooo')
+			
+				
+				total=self.wallet.balance(self.NBCs[sender_id])	
+				
+				print(total)
+				
 
-						inputs=[]
-						outputs=[]																		
-						cur_sum=0
+				for item in self.used_nbcs:
+					
+					total-=item[3]
+				
+				if total<amount:
+					print(total)
+					print(amount)
+					print(self.used_nbcs)
+
+				#print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
+				
+				if (total<amount):
+					print('total not enough')
+					# self.locks['NBCs'].release()
+					# return "Not enough NBCs for the spesified transaction.", 400, None
+					temp_length=len(self.pending_transaction_ids)
+					if temp_length==0:
+						print('no pending transactions')
+						self.locks['NBCs'].release()
+						return "Not enough NBCs for the specified transaction.", 400, None
+					else:
+						self.locks['NBCs'].release()
+						while True:
+							#print('waitingg')
+							
+							# if no pending exit
+							# if len(self.pending_transaction_ids)==0 and:
+							# 	return "Not enough NBCs for the specified transaction.", 400, None
+
+							if temp_length==len(self.pending_transaction_ids):
+								#time.sleep(2)
+								print("started")
+								t=threading.Thread(target=self.sleeper)
+								t.start()
+								t.join()
+								print('joined')
+								continue
+
+							# if pending, check if you have enough
+							total=self.wallet.balance(self.NBCs[sender_id])
+							if total<amount:
+								# if not, sleep
+								print('total still not enogh')
+								temp_length=len(self.pending_transaction_ids)
+								#time.sleep(2)
+							else:
+								print('we can move on with our transaction')
+								self.locks['NBCs'].acquire()
+								break
+							
+
 						
-						# for item in self.NBCs[sender_id]:											  # find the previous transactions the money will come from
-						# 	cur_sum+=item[3]
-						# 	inputs.append(item)
-						# 	if cur_sum>=amount:
-						# 		break
-						#print(self.myNBCs)
-						for item in self.myNBCs:											  # find the previous transactions the money will come from
+				
+				
+				                                                                                 # all checks complete, we are ready to start the transaction
+				try:
+					#print('heloooo')
+
+					inputs=[]
+					outputs=[]																		
+					cur_sum=0
+					
+					for item in self.NBCs[sender_id]:											  # find the previous transactions the money will come from
+						if item not in self.used_nbcs:
 							cur_sum+=item[3]
 							inputs.append(item)
-							self.myNBCs.remove(item)
+							self.used_nbcs.add(item)
 							if cur_sum>=amount:
 								break
-						# self.locks['NBCs'].release()
-						difference=cur_sum-amount													  # calculate how much money the sender has to get back				
-						new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
-						if (difference!=0):
-							out=(str(uuid.uuid1()),new_transaction.transaction_id,sender,difference)
-							outputs.append(out)
-						out2=(str(uuid.uuid1()),new_transaction.transaction_id,receiver,amount)
-						outputs.append(out2)                                             # the money to be given to receiver
-						
-						self.myNBCs.append(out)
-						if receiver==self.ring[self.id]['address']:
-							self.myNBCs.append(out2)
-						#print(self.myNBCs)
-						
-						
-						new_transaction.inputs=inputs                                                 # add the trasaction inputs
-						new_transaction.outputs=outputs          		              	              # add the transaction outputs	
-						new_transaction.sign_transaction()											  # sign transaction	
-						
+						else:
+							continue
+					
+					
+					# self.locks['NBCs'].release()
+					difference=cur_sum-amount													  # calculate how much money the sender has to get back				
+					new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
+					if (difference!=0):
+						out=(str(uuid.uuid1()),new_transaction.transaction_id,sender,difference)
+						outputs.append(out)
+					out2=(str(uuid.uuid1()),new_transaction.transaction_id,receiver,amount)
+					outputs.append(out2)                                             # the money to be given to receiver
+					
+					
+					
+					
+					new_transaction.inputs=inputs                                                 # add the trasaction inputs
+					new_transaction.outputs=outputs          		              	              # add the transaction outputs	
+					new_transaction.sign_transaction()											  # sign transaction	
+					
+
+					
+
+					self.locks['NBCs'].release()
 
 						
-
-						self.locks['NBCs'].release()
-
-						#threading.Thread(target=self.broadcast_transaction, args=(new_transaction,)).start()	 # broadcast to all nodes, should it be called by new thread??
-						#threading.Thread(target=asyncio.run,args=(self.broadcast_transaction(new_transaction),)).start()
-						#broadcast_thread.start()    
-						#print(new_transaction)  
-						return "Transaction created successfully", 200 , new_transaction
-					except:  
-						self.locks['NBCs'].release()                                                                         # Case of unexpected error
-						return "Error creating transaction.", 500, None
+					self.pending_transaction_ids.add(new_transaction.transaction_id)
+					
+					return "Transaction created successfully", 200 , new_transaction
+				except:  
+					self.locks['NBCs'].release()   
+					print('hereeeeeeeeeeeeeeeee')                                                                      # Case of unexpected error
+					return "Error creating transaction.", 500, None
 
 
 	def persistent_sending(*args):
@@ -212,9 +272,6 @@ class Node:
 		#print(trans_to_broadcast)
 		if to_all:
 			for node_ in self.ring:
-				if node_['node_id']==self.id:
-					continue
-				#sent_thread=threading.Thread(target=self.persistent_sending,args=(node_,trans_to_broadcast))
 				sent_thread=threading.Thread(target=self.transaction_sending,args=(node_,trans_to_broadcast))
 				sent_thread.start()
 		else:
@@ -231,8 +288,7 @@ class Node:
 	def validate_transaction(self,transaction,from_resolve_conflict=False):                       # in what form will the transaction be received here? if it is received as dictionary, we have to make changes
 		#use of signature and NBCs balance
 
-		if transaction.sender_address==self.wallet.address:
-			return True
+		
 
 		print('validating')		
 		sender_address=a2b_hex(transaction.sender_address)
@@ -311,10 +367,7 @@ class Node:
 				if output not in self.NBCs[node_id]:
 					self.NBCs[node_id].append(output)
 
-				#print('sender',sender_id)
-				if node_id==self.id and sender_id!=self.id:
-					self.myNBCs.append(output)
-				#print('new nbcs:', self.NBCs)
+				
 		if not from_resolve_conflict:	
 			self.locks['NBCs'].release()
 		
@@ -420,37 +473,53 @@ class Node:
 		
 			self.locks['chain'].release()
 		self.current_block.listOfTransactions.append(transaction)
-		if len(self.current_block.listOfTransactions)==self.current_block.capacity:
+		if len(self.current_block.listOfTransactions)==self.current_block.capacity or time.time()-self.current_block.timestamp>5:
 			print("block is full")
 			#t=threading.Thread(target=asyncio.run, args=(self.mine_block(self.current_block),))
 			#threading.Thread(target=asyncio.run,args=(self.mine_block(self.current_block),)).start()
 			try:
-				#t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
-				#t.start()
-				if self.mining:
-					self.block_to_mine.append(copy.copy(self.current_block))
-				else:
-					t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
-					t.start()
+				t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
+				t.start()
+				
 
 			except Exception as e:
 				print(e)
 				self.locks['cur_block'].release()
 				return
 			self.current_block=None
+		else:
+			print('to mineeeeeeeeeee')
+			t=threading.Thread(target=asyncio.run, args=(self.check_for_mine(),))
+			t.start()
 		self.locks['cur_block'].release()
 		return
+
+	async def check_for_mine(self):
+		while True:
+			print('checking for mine')
+			self.locks['cur_block'].acquire()
+			if self.current_block!=None and time.time()-self.current_block.timestamp>5 and len(self.current_block.listOfTransactions)!=0:
+				t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
+				t.start()
+				self.locks['cur_block'].release()
+				return
+			self.locks['cur_block'].release()
+			time.sleep(3)
 
 
 	async def mine_block(self,block_to_mine):
 
 		# start mining
 		print("mining block")
-		self.mining=True
+		if len(block_to_mine.listOfTransactions)==0:
+			return
+
 		#block_to_mine.nonce=0	
 		block_to_mine.nonce=random.randint(0,10000000000000)														# set initial nonce
 		while not block_to_mine.myHash().startswith('0'*block_to_mine.difficulty):      # keep trying hashing with a different once until number of zeros specified is reached
 			#block_to_mine.nonce+=1	
+			if len(block_to_mine.listOfTransactions)==0:
+				return
 			block_to_mine.nonce=random.randint(0,10000000000000)									
 			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
 			
@@ -472,7 +541,7 @@ class Node:
 								if len(block_to_mine.listOfTransactions)==0:		# if no more transactions in block, stop mining
 									print("stoping block mining, all transactions already mined")
 									self.locks['chain'].release()
-									self.mining=False
+									
 									return	
 								# else:												# otherwise mining will continue
 								# 	block_to_mine.index=self.chain[-1].index+1      # correct block index
@@ -507,13 +576,7 @@ class Node:
 			print("all nodes here, normal case")
 			threading.Thread(target=asyncio.run,args=(self.broadcast_block(block_to_mine),)).start()
 
-		if self.block_to_mine!=[]:
-			next_block=self.block_to_mine[0]
-			self.block_to_mine=self.block_to_mine[1:]
-			t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(next_block)),))
-			t.start()
-		else:
-			self.mining=False
+		
 		return
 
 
@@ -522,7 +585,9 @@ class Node:
 			_,node_,block_to_broadcast=args
 						
 			try:
+				print("sending to node", node_['node_id'])
 				res=requests.post('{}/blocks/receive'.format(node_['contact']), json=block_to_broadcast)
+				print('sent', node_['node_id'])
 				if (res.status_code==200):                                     # block sent
 					print('block sent to node:', node_['node_id'])						
 				else:                                                          # error in sending
@@ -563,6 +628,8 @@ class Node:
 				
 				if not from_resolve_coflict:
 					self.locks['chain'].release()
+				else:
+					self.locks['chain'].release()
 				self.resolve_conflicts()
 				return False
 			else:
@@ -570,16 +637,15 @@ class Node:
 					self.locks['chain'].release()
 
 			for trans in block.listOfTransactions:
-				if trans.transaction_id not in self.valid_transaction_ids:
-					if self.validate_transaction(trans,from_resolve_coflict):
-						print('valid trans')
-						self.update_nbcs(trans,True)
-					else:
-						print('not valid trans')
-							
-						return False
+				
+				if self.validate_transaction(trans,from_resolve_coflict):
+					print('valid trans')
+					self.update_nbcs(trans,True)
 				else:
-					print('transaction already validated')
+					print('not valid trans')
+						
+					return False
+				
 			self.update_ring_amounts()
 			#if not from_resolve_coflict:
 				#self.locks['chain'].release()
@@ -652,7 +718,7 @@ class Node:
 				self.NBCs={}
 				for i in range(0,len(self.ring)):
 					self.NBCs[i]=[]
-				self.valid_transaction_ids=set()
+				
 				self.current_block=None
 				for i in range(0,len(chain)):
 					print('process block:', i)
@@ -699,8 +765,12 @@ class Node:
 							self.resolve_conflicts()
 							return
 					self.chain.append(processed_block)
+
+					for trans in processed_block.listOfTransactions:
+						if trans.transaction_id in self.pending_transaction_ids:
+							self.pending_transaction_ids.remove(trans.transaction_id)
 					
-					self.myNBCs=copy.copy(self.NBCs[self.id])
+					
 		            		      
 			except e:
 				print(e)

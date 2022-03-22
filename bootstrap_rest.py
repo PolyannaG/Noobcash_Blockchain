@@ -1,5 +1,6 @@
 import argparse
 from cmath import e
+from hashlib import new
 
 from operator import index
 from urllib import response
@@ -176,7 +177,7 @@ def register_node():
                     # create transaction to transfer 100 NBCs
                     message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
                     
-                    
+
                     if error_code!=200:
                         return message, error_code
                     print('after creation')
@@ -247,16 +248,30 @@ def receive_block():
 
         # validate block
         print('time to validate block')
-        if node_instance.validate_block(new_block):
+        node_instance.locks['chain'].acquire()
+        if node_instance.validate_block(new_block,True):
             print('block hash valid',new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
-            
+
+            for trans in new_block.listOfTransactions:
+                if trans.transaction_id in node_instance.pending_transaction_ids:
+
+                    for input_ in trans.inputs:
+                        if input_ in node_instance.used_nbcs:
+                            node_instance.used_nbcs.remove(input_)
+
+                    node_instance.pending_transaction_ids.remove(trans.transaction_id)
+                    
             #print(node_instance.chain)
             #print(node_instance.NBCs)
         else:
             print('block hash not valid')
             # should call resolve confict
-
+        node_instance.locks['chain'].release()
+        # try:
+        #     node_instance.locks['chain'].release()
+        # except:
+        #     return {'message': "Received"}, 200
         return {'message': "Received"}, 200
             
     except e:

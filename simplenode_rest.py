@@ -3,6 +3,7 @@ from cmath import e
 from operator import index
 from os import abort
 from platform import node
+import re
 from turtle import pu
 import requests
 from flask import Flask, jsonify, request, render_template
@@ -148,7 +149,7 @@ def read_file_trans():
                             print('error creating trans')
                             continue
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
-                    node_instance.add_transaction_to_block(trans)
+                    
                     break
         except:
             print('error2 creating trans')
@@ -261,6 +262,8 @@ def receive_ring():
 
 @app.route('/blockchain/get', methods=['POST'])
 def receive_blockchain():
+    if node_instance.chain!=[]:
+        return {'message': 'Blockchain already received'}, 200
     print('receive blockchain endpoint')
     data=request.get_json()
     try:
@@ -321,6 +324,17 @@ def receive_block():
         if node_instance.validate_block(new_block,True):
             print('block hash valid', new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
+
+            for trans in new_block.listOfTransactions:
+                if trans.transaction_id in node_instance.pending_transaction_ids:
+
+                    for input_ in trans.inputs:
+                        if input_ in node_instance.used_nbcs:
+                            node_instance.used_nbcs.remove(input_)
+
+                    node_instance.pending_transaction_ids.remove(trans.transaction_id)
+            
+        
             
             #print(node_instance.chain)
             #print(node_instance.NBCs)
@@ -328,6 +342,10 @@ def receive_block():
             print('block hash not valid')
             # should call resolve confict
         node_instance.locks['chain'].release()
+        # try:
+        #     node_instance.locks['chain'].release()
+        # except:
+        #     return {'message': "Received"}, 200
         return {'message': "Received"}, 200
             
     except e:
