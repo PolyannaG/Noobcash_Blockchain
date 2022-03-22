@@ -37,6 +37,7 @@ def initial():
         if (res.status_code==200):                                     # registration succeeded
             res=res.json()
             node_instance.id=res['node_id']                            # node id is the one given by bootstrap
+            print(node_instance.id)
             print('node has been registered to ring by bootstrap')
         else:                                                          # error in registration
             print('error in regitration:', res.json()['message'])
@@ -147,7 +148,9 @@ def read_file_trans():
                     message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
                     if error_code!=200:
                             print('error creating trans')
+                            print(message)
                             continue
+                    print('crrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr')
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
                     
                     break

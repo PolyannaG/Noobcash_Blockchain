@@ -118,8 +118,9 @@ class Node:
 			#print(sender_id)
 			if sender_id==None:						
 				return "Sender not part of ring." ,400, None
-			elif sender_id!=self.id:																  # check that the node is indeed the current one (for safety, should always be true)
-				return "Sender not current node, you do not own this wallet.", 400, None
+			elif sender_id!=self.id:
+				print(self.id, sender_id)																  # check that the node is indeed the current one (for safety, should always be true)
+				return "1Sender not current node, you do not own this wallet.", 400, None
 			else:
 				self.locks['NBCs'].acquire()
 			
@@ -148,7 +149,7 @@ class Node:
 					if temp_length==0:
 						print('no pending transactions')
 						self.locks['NBCs'].release()
-						return "Not enough NBCs for the specified transaction.", 400, None
+						return "2Not enough NBCs for the specified transaction.", 400, None
 					else:
 						self.locks['NBCs'].release()
 						while True:
@@ -226,11 +227,11 @@ class Node:
 						
 					self.pending_transaction_ids.add(new_transaction.transaction_id)
 					
-					return "Transaction created successfully", 200 , new_transaction
+					return "3Transaction created successfully", 200 , new_transaction
 				except:  
 					self.locks['NBCs'].release()   
 					print('hereeeeeeeeeeeeeeeee')                                                                      # Case of unexpected error
-					return "Error creating transaction.", 500, None
+					return "4Error creating transaction.", 500, None
 
 
 	def persistent_sending(*args):
@@ -336,6 +337,8 @@ class Node:
 			
 			return True                                         
 		except:
+			if not from_resolve_conflict:
+				self.locks['NBCs'].release()
 			return False
 
 	def update_nbcs(self,transaction,from_resolve_conflict=False):
@@ -487,11 +490,13 @@ class Node:
 				self.locks['cur_block'].release()
 				return
 			self.current_block=None
+			self.locks['cur_block'].release()
 		else:
 			print('to mineeeeeeeeeee')
+			self.locks['cur_block'].release()
 			t=threading.Thread(target=asyncio.run, args=(self.check_for_mine(),))
 			t.start()
-		self.locks['cur_block'].release()
+		
 		return
 
 	async def check_for_mine(self):
@@ -501,6 +506,7 @@ class Node:
 			if self.current_block!=None and time.time()-self.current_block.timestamp>5 and len(self.current_block.listOfTransactions)!=0:
 				t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
 				t.start()
+				self.current_block=None
 				self.locks['cur_block'].release()
 				return
 			self.locks['cur_block'].release()
@@ -569,6 +575,13 @@ class Node:
 																					   # should the chain object the Blockchain or a list?
 			
 			for trans in block_to_mine.listOfTransactions:
+				if trans.transaction_id in self.pending_transaction_ids:
+					for input_ in trans.inputs:
+						if input_ in self.used_nbcs:
+							self.used_nbcs.remove(input_)
+						self.pending_transaction_ids.remove(trans.transaction_id)
+			
+			for trans in block_to_mine.listOfTransactions:
 				self.update_nbcs(trans)
 			self.locks['chain'].release()
 		# otherwise, all nodes are in the ring: normal case, mined block has to be broadcasted
@@ -587,7 +600,7 @@ class Node:
 			try:
 				print("sending to node", node_['node_id'])
 				res=requests.post('{}/blocks/receive'.format(node_['contact']), json=block_to_broadcast)
-				print('sent', node_['node_id'])
+				#print('sent', node_['node_id'])
 				if (res.status_code==200):                                     # block sent
 					print('block sent to node:', node_['node_id'])						
 				else:                                                          # error in sending
