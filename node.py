@@ -781,6 +781,11 @@ class Node:
 
 					for trans in processed_block.listOfTransactions:
 						if trans.transaction_id in self.pending_transaction_ids:
+
+							for input_ in trans.inputs:
+								if input_ in self.used_nbcs:
+									self.used_nbcs.remove(input_)
+
 							self.pending_transaction_ids.remove(trans.transaction_id)
 					
 					
