@@ -124,6 +124,7 @@ def read_file_trans():
     
         # Get next line from file
         line = file1.readline()
+        time.sleep(3)
     
         # if line is empty
         # end of file is reached
@@ -141,12 +142,13 @@ def read_file_trans():
                 if node_['node_id']==id:
                     print('receiver node address found')
                     receiver_address=node_['address']
-                    print(node_instance.wallet.public_key,receiver_address)
+                    #print(node_instance.wallet.public_key,receiver_address)
                     message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
                     if error_code!=200:
                             print('error creating trans')
                             continue
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                    node_instance.add_transaction_to_block(trans)
                     break
         except:
             print('error2 creating trans')
@@ -262,12 +264,13 @@ def receive_blockchain():
     print('receive blockchain endpoint')
     data=request.get_json()
     try:
+        node_instance.locks['chain'].acquire()
         for i in range(0,len(data)):
             #print(i)
             block_to_get=data[i]
             processed_block=process_block(block_to_get)
             if (i!=0):                                                  # genesis block is not validated              
-                if not node_instance.validate_block(processed_block):   # block not valid, this and all following will not be added to blockchain
+                if not node_instance.validate_block(processed_block,True):   # block not valid, this and all following will not be added to blockchain
                     print('found block not valid in blockchain')
                     return {'message': 'Blockchain received'}, 200
             else:
@@ -285,11 +288,17 @@ def receive_blockchain():
                                 return False
                             if output not in node_instance.NBCs[node_id]:
                                 node_instance.NBCs[node_id].append(output)
+                            if node_id==node_instance.id:
+                                node_instance.myNBCs.append(output)
                     except e:
                         print(e)
             node_instance.chain.append(processed_block)                 # block valid, add to blockchain
-            return {'message': 'Blockchain received'}, 200
+            
+            print('appended',i)
+        node_instance.locks['chain'].release()
+        return {'message': 'Blockchain received'}, 200
     except:
+        node_instance.locks['chain'].release()
         return {'message': 'Error in receiving blockchain'}, 400
 
 
@@ -308,15 +317,17 @@ def receive_block():
 
         # validate block
         print('time to validate block')
-        if node_instance.validate_block(new_block):
-            print('block hash valid')
+        node_instance.locks['chain'].acquire()
+        if node_instance.validate_block(new_block,True):
+            print('block hash valid', new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
+            
             #print(node_instance.chain)
             #print(node_instance.NBCs)
         else:
             print('block hash not valid')
             # should call resolve confict
-
+        node_instance.locks['chain'].release()
         return {'message': "Received"}, 200
             
     except e:

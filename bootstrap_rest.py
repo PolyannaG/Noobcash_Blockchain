@@ -248,8 +248,9 @@ def receive_block():
         # validate block
         print('time to validate block')
         if node_instance.validate_block(new_block):
-            print('block hash valid')
+            print('block hash valid',new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
+            
             #print(node_instance.chain)
             #print(node_instance.NBCs)
         else:
