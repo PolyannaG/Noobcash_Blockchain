@@ -39,7 +39,7 @@ class Node:
 		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock, 'conf': conflict_lock}
 
 
-		self.block_capacity=2
+		self.block_capacity=6
 		
 		
 		self.chain=[]
@@ -59,6 +59,8 @@ class Node:
 		self.pending_transaction_ids=set()
 		self.used_nbcs=set()
 		self.get_back=set()
+
+		#self.trans_pool=set()
 		
 		print("creating new node instance")
 
@@ -666,7 +668,7 @@ class Node:
 		if block.myHash().startswith('0'*int(os.getenv('DIFFICULTY'))):  # check that block hash is correct
 			#should check previous hash here
 			#print(self.chain)
-			print('hash ok')
+			#print('hash ok')
 			if not from_resolve_coflict:
 				self.locks['chain'].acquire()
 			
@@ -685,9 +687,13 @@ class Node:
 				try:
 					self.locks['chain'].release()
 				except:
-					print()
+					True
+
+
+				
+
 				self.locks['conf'].acquire()
-				if block.index<self.chain[-1].index:
+				if block.index<self.chain[-1].index or block.hash==self.chain[-1].hash:
 					print('no need to rerolve')
 					# for trans in block.listOfTransactions:
 					# 	if trans.transaction_id in self.pending_transaction_ids:
@@ -717,7 +723,7 @@ class Node:
 			try:
 				self.locks['chain'].release()
 			except:
-				print()
+				True
 			for trans in block.listOfTransactions:
 				
 				if self.validate_transaction(trans,from_resolve_coflict):
@@ -816,7 +822,7 @@ class Node:
 				for i in range(0,len(chain)):
 					
 					processed_block=self.process_block(chain[i])
-					print('process block:', processed_block.index)
+					#print('process block:', processed_block.index)
 					if i==0:
 						for item in processed_block.listOfTransactions:
 							try:

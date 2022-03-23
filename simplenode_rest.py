@@ -135,9 +135,9 @@ def read_file_trans():
             break
         line=line.strip()
         id=line.split()[0]
-        id=int(id[2:])-1
+        id=int(id[2:])
         if id>node_instance.node_number:
-            id=0
+            continue
         amount=int(line.split()[1])
         try:
         
@@ -351,6 +351,17 @@ def receive_block():
             #print(node_instance.NBCs)
         else:
             print('block hash not valid')
+
+            # for trans in new_block.listOfTransactions:
+            #     if trans.transaction_id in node_instance.pending_transaction_ids:
+            #         print('------------------------------------------------------------------------------------------------')
+            #         for input_ in trans.inputs:
+            #             if input_ in node_instance.used_nbcs:
+            #                 node_instance.used_nbcs.remove(input_)
+            #         for output_ in trans.outputs:
+            #             if output_ in node_instance.get_back:
+            #                 node_instance.get_back.remove(output_)
+            #         node_instance.pending_transaction_ids.remove(trans.transaction_id)
             # should call resolve confict
         try:
             node_instance.locks['chain'].release()
