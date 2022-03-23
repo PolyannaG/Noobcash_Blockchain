@@ -31,11 +31,12 @@ class Node:
 		#self.NBC=100;
 		##set
 
-		NBCs_lock=threading.Lock()
-		valid_transactions_lock=threading.Lock()
-		cur_block_lock=threading.Lock()
-		chain_lock=threading.Lock()
-		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock}
+		NBCs_lock=threading.RLock()
+		valid_transactions_lock=threading.RLock()
+		cur_block_lock=threading.RLock()
+		chain_lock=threading.RLock()
+		conflict_lock=threading.RLock()
+		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock, 'conf': conflict_lock}
 
 
 		self.block_capacity=2
@@ -153,13 +154,16 @@ class Node:
 					else:
 						self.locks['NBCs'].release()
 						while True:
-							#print('waitingg')
+							print('waitingg')
 							
 							# if no pending exit
 							# if len(self.pending_transaction_ids)==0 and:
 							# 	return "Not enough NBCs for the specified transaction.", 400, None
+							total=self.wallet.balance(self.NBCs[sender_id])				
+							for item in self.used_nbcs:	
+								total-=item[3]
 
-							if temp_length==len(self.pending_transaction_ids):
+							if temp_length==len(self.pending_transaction_ids) and total<amount:
 								#time.sleep(2)
 								print("started")
 								t=threading.Thread(target=self.sleeper)
@@ -463,10 +467,11 @@ class Node:
 
 	def add_transaction_to_block(self,transaction,capacity=None):
 		#if enough transactions  mine
+		self.locks['chain'].acquire()
 		self.locks['cur_block'].acquire()
 		if self.current_block==None:
 			print("creating new block",transaction)
-			self.locks['chain'].acquire()
+			
 			if self.chain==[]:                                            # case of genesis block
 				self.current_block=self.create_new_block(0,1,None,1)
 			elif capacity!=None:									  # case of initial transactions from bootstrap, they will be a block	
@@ -474,7 +479,7 @@ class Node:
 			else:
 				self.current_block=self.create_new_block(self.chain[-1].index+1, self.chain[-1].hash, None, self.block_capacity)  # usual case, create next current block following the last of the blockchain
 		
-			self.locks['chain'].release()
+		self.locks['chain'].release()
 		self.current_block.listOfTransactions.append(transaction)
 		if len(self.current_block.listOfTransactions)==self.current_block.capacity or time.time()-self.current_block.timestamp>5:
 			print("block is full")
@@ -501,7 +506,7 @@ class Node:
 
 	async def check_for_mine(self):
 		while True:
-			print('checking for mine')
+			#print('checking for mine')
 			self.locks['cur_block'].acquire()
 			if self.current_block!=None and time.time()-self.current_block.timestamp>5 and len(self.current_block.listOfTransactions)!=0:
 				t=threading.Thread(target=asyncio.run, args=(self.mine_block(copy.copy(self.current_block)),))
@@ -636,19 +641,35 @@ class Node:
 			if len(self.chain)>=1 and block.previousHash!=self.chain[-1].hash:
 				#print(block.previousHash)
 				#print(self.chain[-1])
-				print('errrrrrrrrrrrrrrrrrrrrrrrrrrror')
+				print('errrrrrrrrrrrrrrrrrrrrrrrrrrror', block.index)
+				if from_resolve_coflict:
+					print('from resolve')
 				#threading.Thread(target=asyncio.run, args=(self.resolve_conflicts(),)).start()
 				
-				if not from_resolve_coflict:
+				# if not from_resolve_coflict:
+				# 	self.locks['chain'].release()
+				# else:
+				# 	self.locks['chain'].release()
+				try:
 					self.locks['chain'].release()
-				else:
-					self.locks['chain'].release()
-				self.resolve_conflicts()
+				except:
+					print()
+				self.locks['conf'].acquire()
+				print('-------------------starting resolve conf---------------------------')
+				t=threading.Thread(target=self.resolve_conflicts)
+				t.start()
+				t.join()
+				print('---------------------------ending resolve conf---------------------------')
+				#self.resolve_conflicts()
+				self.locks['conf'].release()
 				return False
 			else:
 				if not from_resolve_coflict:
 					self.locks['chain'].release()
-
+			try:
+				self.locks['chain'].release()
+			except:
+				print()
 			for trans in block.listOfTransactions:
 				
 				if self.validate_transaction(trans,from_resolve_coflict):
@@ -689,7 +710,17 @@ class Node:
 
 	def resolve_conflicts(self):
 		#resolve correct chain
+		print('acquiring locks')
+		self.locks['chain'].acquire()
+		print('aq0')
+		self.locks['cur_block'].acquire()
+		print('aq1')
+		self.locks['NBCs'].acquire()
+		print('aq2')
+		self.locks['valid_trans'].acquire()
+		print('aquired locks')
 		lengths=[]
+		
 		for node_ in self.ring:
 			res=requests.get(node_['contact']+'/blockchain/length')
 			if res.status_code==200:
@@ -717,15 +748,15 @@ class Node:
 					res=res.json()
 					break
 			try:
-				print('acquiring locks')
-				self.locks['chain'].acquire()
-				print('aq0')
-				self.locks['cur_block'].acquire()
-				print('aq1')
-				self.locks['NBCs'].acquire()
-				print('aq2')
-				self.locks['valid_trans'].acquire()
-				print('aquired locks')
+				# print('acquiring locks')
+				# self.locks['chain'].acquire()
+				# print('aq0')
+				# self.locks['cur_block'].acquire()
+				# print('aq1')
+				# self.locks['NBCs'].acquire()
+				# print('aq2')
+				# self.locks['valid_trans'].acquire()
+				# print('aquired locks')
 				chain=res['chain']
 				self.chain=[]
 				self.NBCs={}
@@ -733,6 +764,7 @@ class Node:
 					self.NBCs[i]=[]
 				
 				self.current_block=None
+				print('length of chain received: ',len(chain))
 				for i in range(0,len(chain)):
 					print('process block:', i)
 					processed_block=self.process_block(chain[i])
@@ -799,11 +831,16 @@ class Node:
 				self.locks['valid_trans'].release()
 				self.resolve_conflicts()
 				return
-			self.update_ring_amounts()
+		self.update_ring_amounts()
+		try:
 			self.locks['chain'].release()
 			self.locks['cur_block'].release()
 			self.locks['NBCs'].release()
 			self.locks['valid_trans'].release()		
+		except:
+			self.locks['cur_block'].release()
+			self.locks['NBCs'].release()
+			self.locks['valid_trans'].release()
 		return
 
 

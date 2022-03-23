@@ -51,6 +51,7 @@ def initial():
 app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
+chain_extra=threading.Lock()
 
 
 #......................................................................................
@@ -248,6 +249,7 @@ def receive_block():
 
         # validate block
         print('time to validate block')
+        chain_extra.acquire()
         node_instance.locks['chain'].acquire()
         if node_instance.validate_block(new_block,True):
             print('block hash valid',new_block.index)
@@ -267,7 +269,12 @@ def receive_block():
         else:
             print('block hash not valid')
             # should call resolve confict
-        node_instance.locks['chain'].release()
+        try:
+            chain_extra.release()
+            node_instance.locks['chain'].release()
+            
+        except:
+            print()
         # try:
         #     node_instance.locks['chain'].release()
         # except:

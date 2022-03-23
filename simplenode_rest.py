@@ -49,7 +49,7 @@ app = Flask(__name__)
 CORS(app)
 blockchain = Blockchain()
 node_instance=Node()
-
+chain_extra=threading.Lock()
 #......................................................................................
 
 def process_transaction(item):
@@ -122,11 +122,12 @@ def read_file_trans():
     count = 0
     
     while True:
+        print('new transaction ', count)
         count += 1
     
         # Get next line from file
         line = file1.readline()
-        time.sleep(3)
+        #time.sleep(3)
     
         # if line is empty
         # end of file is reached
@@ -301,7 +302,10 @@ def receive_blockchain():
             node_instance.chain.append(processed_block)                 # block valid, add to blockchain
             
             print('appended',i)
-        node_instance.locks['chain'].release()
+        try:
+            node_instance.locks['chain'].release()
+        except:
+            print()
         return {'message': 'Blockchain received'}, 200
     except:
         node_instance.locks['chain'].release()
@@ -323,6 +327,7 @@ def receive_block():
 
         # validate block
         print('time to validate block')
+        chain_extra.acquire()
         node_instance.locks['chain'].acquire()
         if node_instance.validate_block(new_block,True):
             print('block hash valid', new_block.index)
@@ -344,11 +349,16 @@ def receive_block():
         else:
             print('block hash not valid')
             # should call resolve confict
-        node_instance.locks['chain'].release()
-        # try:
-        #     node_instance.locks['chain'].release()
-        # except:
-        #     return {'message': "Received"}, 200
+        try:
+            node_instance.locks['chain'].release()
+        except:
+            print()
+        try:
+            chain_extra.release()
+            node_instance.locks['chain'].release()
+            
+        except:
+            return {'message': "Received"}, 200
         return {'message': "Received"}, 200
             
     except e:
