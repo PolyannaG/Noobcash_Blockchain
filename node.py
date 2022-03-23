@@ -58,6 +58,7 @@ class Node:
 		
 		self.pending_transaction_ids=set()
 		self.used_nbcs=set()
+		self.get_back=set()
 		
 		print("creating new node instance")
 
@@ -135,9 +136,11 @@ class Node:
 					
 					total-=item[3]
 				
+				
 				if total<amount:
 					print(total)
 					print(amount)
+					print(self.get_back)
 					print(self.used_nbcs)
 
 				#print(self.NBCs)									  # check that the node has enough NBCs for the transaction	
@@ -159,13 +162,25 @@ class Node:
 							# if no pending exit
 							# if len(self.pending_transaction_ids)==0 and:
 							# 	return "Not enough NBCs for the specified transaction.", 400, None
+							self.locks['NBCs'].acquire()
 							total=self.wallet.balance(self.NBCs[sender_id])				
 							for item in self.used_nbcs:	
 								total-=item[3]
+							
+							print(len(self.pending_transaction_ids))
+							print(total,amount)
+
+							sum_=0
+							for item in self.get_back:
+								sum_+=item[3]
+							if total+sum_<amount:
+								self.locks['NBCs'].release()
+								print('not enough for trans, exiting trans')
+								return "2.3Not enough NBCs for the specified transaction.", 400, None
 
 							if temp_length==len(self.pending_transaction_ids) and total<amount:
 								#time.sleep(2)
-								print("started")
+								self.locks['NBCs'].release()
 								t=threading.Thread(target=self.sleeper)
 								t.start()
 								t.join()
@@ -173,15 +188,20 @@ class Node:
 								continue
 
 							# if pending, check if you have enough
-							total=self.wallet.balance(self.NBCs[sender_id])
+							# total=self.wallet.balance(self.NBCs[sender_id])
+							# for item in self.used_nbcs:	
+							# 	total-=item[3]
 							if total<amount:
+								self.locks['NBCs'].release()
 								# if not, sleep
 								print('total still not enogh')
 								temp_length=len(self.pending_transaction_ids)
+								if temp_length==0:
+									return "2.5Not enough NBCs for the specified transaction.", 400, None
 								#time.sleep(2)
 							else:
 								print('we can move on with our transaction')
-								self.locks['NBCs'].acquire()
+								#self.locks['NBCs'].acquire()
 								break
 							
 
@@ -208,11 +228,20 @@ class Node:
 					
 					
 					# self.locks['NBCs'].release()
-					difference=cur_sum-amount													  # calculate how much money the sender has to get back				
+					difference=cur_sum-amount
+					if difference<0:
+						print('------------------------------')													  # calculate how much money the sender has to get back				
+						print('------------------------------------------------------------------------------------------')
+						print('------------------------------------------------------------------------------------')
+						print(len(self.pending_transaction_ids))
+						print(total)
+						print('------------------------------------------------------------------------------------------')
+						print('------------------------------------------------------------------------------------')
 					new_transaction=Transaction(sender,self.wallet.private_key,receiver,amount)   # create the trascaction
 					if (difference!=0):
 						out=(str(uuid.uuid1()),new_transaction.transaction_id,sender,difference)
 						outputs.append(out)
+						self.get_back.add(out)
 					out2=(str(uuid.uuid1()),new_transaction.transaction_id,receiver,amount)
 					outputs.append(out2)                                             # the money to be given to receiver
 					
@@ -584,7 +613,10 @@ class Node:
 					for input_ in trans.inputs:
 						if input_ in self.used_nbcs:
 							self.used_nbcs.remove(input_)
-						self.pending_transaction_ids.remove(trans.transaction_id)
+					for output_ in trans.outputs:
+						if output_ in self.get_back:
+							self.get_back.remove(output_)
+					self.pending_transaction_ids.remove(trans.transaction_id)
 			
 			for trans in block_to_mine.listOfTransactions:
 				self.update_nbcs(trans)
@@ -657,6 +689,14 @@ class Node:
 				self.locks['conf'].acquire()
 				if block.index<self.chain[-1].index:
 					print('no need to rerolve')
+					# for trans in block.listOfTransactions:
+					# 	if trans.transaction_id in self.pending_transaction_ids:
+
+					# 		for input_ in trans.inputs:
+					# 			if input_ in self.used_nbcs:
+					# 				self.used_nbcs.remove(input_)
+
+					# 		self.pending_transaction_ids.remove(trans.transaction_id)
 					self.locks['conf'].release()
 					try:
 						self.locks['chain'].release()
@@ -811,10 +851,15 @@ class Node:
 					else:
 						if not self.validate_block(processed_block,True):   # block not valid, this and all following will not be added to blockchain
 							print('found block not valid in blockchain')
-							self.locks['chain'].release()
-							self.locks['cur_block'].release()
-							self.locks['NBCs'].release()
-							self.locks['valid_trans'].release()
+							try:
+								self.locks['chain'].release()
+								self.locks['cur_block'].release()
+								self.locks['NBCs'].release()
+								self.locks['valid_trans'].release()
+							except:
+								self.locks['cur_block'].release()
+								self.locks['NBCs'].release()
+								self.locks['valid_trans'].release()
 							print('error in block: ',i)
 							self.resolve_conflicts()
 							return
@@ -826,7 +871,9 @@ class Node:
 							for input_ in trans.inputs:
 								if input_ in self.used_nbcs:
 									self.used_nbcs.remove(input_)
-
+							for output_ in trans.outputs:
+								if output_ in self.get_back:
+									self.get_back.remove(output_)
 							self.pending_transaction_ids.remove(trans.transaction_id)
 					
 					

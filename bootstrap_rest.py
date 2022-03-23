@@ -119,7 +119,7 @@ def process_block(data):
 
 @app.route('/file_transactions', methods=['GET'])
 def read_file_trans():
-    file1 = open('transactions1.txt', 'r')
+    file1 = open('transactions{}.txt'.format(node_instance.id), 'r')
     count = 0
     
     while True:
@@ -306,6 +306,9 @@ def receive_block():
                     for input_ in trans.inputs:
                         if input_ in node_instance.used_nbcs:
                             node_instance.used_nbcs.remove(input_)
+                    for output_ in trans.outputs:
+                        if output_ in node_instance.get_back:
+                            node_instance.get_back.remove(output_)
 
                     node_instance.pending_transaction_ids.remove(trans.transaction_id)
                     
