@@ -295,7 +295,7 @@ class Node:
 
 		
 
-		print('validating')		
+		#print('validating')		
 		sender_address=a2b_hex(transaction.sender_address)
 		key=RSA.importKey(sender_address)                              # public key of sender is the sender's address
 		#print('key imported')
@@ -333,7 +333,7 @@ class Node:
 						if not from_resolve_conflict:
 							self.locks['NBCs'].release()
 						return False
-				print('found utxo')
+				#print('found utxo')
 				if not from_resolve_conflict:
 					self.locks['NBCs'].release()
 			# add transaction outputs to UTXOs list (NBCs)
@@ -655,6 +655,14 @@ class Node:
 				except:
 					print()
 				self.locks['conf'].acquire()
+				if block.index<self.chain[-1].index:
+					print('no need to rerolve')
+					self.locks['conf'].release()
+					try:
+						self.locks['chain'].release()
+					except:
+						True
+					return False
 				print('-------------------starting resolve conf---------------------------')
 				t=threading.Thread(target=self.resolve_conflicts)
 				t.start()
@@ -673,7 +681,7 @@ class Node:
 			for trans in block.listOfTransactions:
 				
 				if self.validate_transaction(trans,from_resolve_coflict):
-					print('valid trans')
+					#print('valid trans')
 					self.update_nbcs(trans,True)
 				else:
 					print('not valid trans')
@@ -766,8 +774,9 @@ class Node:
 				self.current_block=None
 				print('length of chain received: ',len(chain))
 				for i in range(0,len(chain)):
-					print('process block:', i)
+					
 					processed_block=self.process_block(chain[i])
+					print('process block:', processed_block.index)
 					if i==0:
 						for item in processed_block.listOfTransactions:
 							try:
