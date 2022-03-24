@@ -112,7 +112,33 @@ def process_block(data):
 
 
 #.......................................................................................
+@app.route('/data/print',methods=['GET'])
+def print_data():
+    temp=[]
+    for item in node_instance.transactions_created:
+        if item not in node_instance.transactions_done:
+            temp.append(item)
+    print(node_instance.transactions_read,len(node_instance.transactions_created),len(node_instance.transactions_done))
+    response={
+        'blocks_mined': node_instance.blocks_mined,
+        'transactions_read': node_instance.transactions_read,
+        'transactions_created': node_instance.transactions_created,
+        'transactions_done': node_instance.transactions_done,
+        'transactions invalid': node_instance.transactions_denied,
+        'in_created_not_done': temp    }
+    return jsonify(response), 200
 
+@app.route('/second',methods=['GET'])
+def second():
+    all_trans=[]
+    for block in node_instance.chain:
+        for trans in block.listOfTransactions:
+            if ((trans.transaction_id,trans.amount)) in node_instance.transactions_created:
+                all_trans.append((trans.transaction_id,trans.amount))
+    for item in node_instance.transactions_created:
+        if item not in all_trans:
+            print(item)
+    return {}, 200
 
 # get all transactions in the blockchain
 
@@ -124,6 +150,8 @@ def read_file_trans():
     while True:
         print('new transaction ', count)
         count += 1
+
+        
     
         # Get next line from file
         line = file1.readline()
@@ -140,6 +168,7 @@ def read_file_trans():
             continue
         amount=int(line.split()[1])
         try:
+            node_instance.transactions_read+=1
         
             for node_ in node_instance.ring:
                 if node_['node_id']==id:
@@ -344,6 +373,7 @@ def receive_block():
                             node_instance.get_back.remove(output_)
 
                     node_instance.pending_transaction_ids.remove(trans.transaction_id)
+                    node_instance.transactions_done.append((trans.transaction_id,trans.amount))
             
         
             
@@ -365,14 +395,15 @@ def receive_block():
             # should call resolve confict
         try:
             node_instance.locks['chain'].release()
+            chain_extra.release
         except:
-            print()
-        try:
             chain_extra.release()
-            node_instance.locks['chain'].release()
+        # try:
+        #     chain_extra.release()
+        #     node_instance.locks['chain'].release()
             
-        except:
-            return {'message': "Received"}, 200
+        # except:
+        #     return {'message': "Received"}, 200
         return {'message': "Received"}, 200
             
     except e:

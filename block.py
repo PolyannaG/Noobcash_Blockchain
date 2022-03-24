@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 
 class Block:
-	def __init__(self,index,previousHash,nonce,capacity=6):
+	def __init__(self,index,previousHash,nonce,capacity=1):
 		##se
 		load_dotenv()
 		self.index=index

@@ -39,7 +39,7 @@ class Node:
 		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock, 'conf': conflict_lock}
 
 
-		self.block_capacity=6
+		self.block_capacity=1
 		
 		
 		self.chain=[]
@@ -61,6 +61,13 @@ class Node:
 		self.get_back=set()
 
 		#self.trans_pool=set()
+
+
+		self.blocks_mined=0
+		self.transactions_read=0
+		self.transactions_created=[]
+		self.transactions_done=[]
+		self.transactions_denied=[]
 		
 		print("creating new node instance")
 
@@ -261,6 +268,8 @@ class Node:
 
 						
 					self.pending_transaction_ids.add(new_transaction.transaction_id)
+
+					self.transactions_created.append((new_transaction.transaction_id,new_transaction.amount))
 					
 					return "3Transaction created successfully", 200 , new_transaction
 				except:  
@@ -358,6 +367,21 @@ class Node:
 							#self.NBCs[sender_id].remove(utxo)
 					if not found_utxo:
 						print('utxo not unspent')
+						
+						
+						if transaction.transaction_id in self.pending_transaction_ids:
+
+							for input_ in transaction.inputs:
+								if input_ in self.used_nbcs:
+									self.used_nbcs.remove(input_)
+							for output_ in self.outputs:
+								if output_ in self.get_back:
+									self.get_back.remove(output_)
+
+						self.pending_transaction_ids.remove(transaction.transaction_id)
+						self.transactions_denied.append((transaction.transaction_id,transaction.amount))
+						
+						
 						if from_resolve_conflict:
 							print(self.NBCs[sender_id])
 							print('input', input)
@@ -562,7 +586,7 @@ class Node:
 			#block_to_mine.nonce+=1	
 			if len(block_to_mine.listOfTransactions)==0:
 				return
-			block_to_mine.nonce=random.randint(0,10000000000000)									
+			block_to_mine.nonce=random.randint(0,1000000000000000)									
 			# should we be checking if a bloack is already in its place in the chain or if a transaction in the block is already included in a different block?
 			
 			# check that transactions have not already been included to blockchain by a different node
@@ -600,6 +624,7 @@ class Node:
 									
 			self.locks['chain'].release()
 		print('block mined')
+		self.blocks_mined+=1
 
 		# mining finished, time to broadcast block to all nodes (if we already have a completed ring)
 
@@ -619,6 +644,7 @@ class Node:
 						if output_ in self.get_back:
 							self.get_back.remove(output_)
 					self.pending_transaction_ids.remove(trans.transaction_id)
+					self.transactions_done.append((trans.transaction_id,trans.amount))
 			
 			for trans in block_to_mine.listOfTransactions:
 				self.update_nbcs(trans)
@@ -717,13 +743,13 @@ class Node:
 				#self.resolve_conflicts()
 				self.locks['conf'].release()
 				return False
-			else:
-				if not from_resolve_coflict:
-					self.locks['chain'].release()
-			try:
-				self.locks['chain'].release()
-			except:
-				True
+			# else:
+			# 	if not from_resolve_coflict:
+			# 		self.locks['chain'].release()
+			# try:
+			# 	self.locks['chain'].release()
+			# except:
+			# 	True
 			for trans in block.listOfTransactions:
 				
 				if self.validate_transaction(trans,from_resolve_coflict):
@@ -731,12 +757,19 @@ class Node:
 					self.update_nbcs(trans,True)
 				else:
 					print('not valid trans')
-						
+					try:
+						self.locks['chain'].release()
+					except:
+						True
 					return False
 				
 			self.update_ring_amounts()
 			#if not from_resolve_coflict:
 				#self.locks['chain'].release()
+			try:
+				self.locks['chain'].release()
+			except:
+				True
 			return True
 		else:
 			print('hash not ok')
@@ -881,6 +914,7 @@ class Node:
 								if output_ in self.get_back:
 									self.get_back.remove(output_)
 							self.pending_transaction_ids.remove(trans.transaction_id)
+							self.transactions_done.append((trans.transaction_id,trans.amount))
 					
 					
 		            		      
