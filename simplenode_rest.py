@@ -220,7 +220,10 @@ def get_blockhain_length():
 
 @app.route('/blockchain/get', methods=['GET'])
 def send_blockchain():
-    response={'chain': node_instance.send_blockchain_resolve_conflict()}
+    data=request.args
+    index=data["index"]
+    print(index)
+    response={'chain': node_instance.send_blockchain_resolve_conflict(index)}
     return jsonify(response),200
 
 @app.route('/resolve_confict',methods=['GET'])

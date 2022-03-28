@@ -736,7 +736,9 @@ class Node:
 						True
 					return False
 				print('-------------------starting resolve conf---------------------------')
-				t=threading.Thread(target=self.resolve_conflicts)
+				index_to_ask=max(block.index-10,0)
+				
+				t=threading.Thread(target=self.resolve_conflicts,args=(index_to_ask,))
 				t.start()
 				t.join()
 				print('---------------------------ending resolve conf---------------------------')
@@ -795,7 +797,37 @@ class Node:
 				return False
 		return True
 
-	def resolve_conflicts(self):
+	def restore_nbcs(self,transaction):
+		for item in self.ring:
+			if transaction.sender_address==item['address']:
+				sender_id=item['node_id']
+				#print('found sender in ring',sender_id)
+				
+
+		for input in transaction.inputs:                     # check that every input is unspent
+			#print(input)
+			self.NBCs[sender_id].append(input)
+			if sender_id==self.id:
+				if input in self.used_nbcs:
+					self.used_nbcs.remove(input)
+		
+				
+
+		for output in transaction.outputs:                 # inputs unspent, time to add outputs to NBCs list
+				for item in self.ring:                         # find id of node whose wallter will get the NBCs
+					if output[2]==item['address']:
+						#print('found node id',item['node_id'])
+						node_id=item['node_id']
+				if output in self.NBCs[node_id]:
+					self.NBCs[node_id].remove(output)
+				if node_id==self.id:
+					if output in self.get_back:
+						self.get_back.remove(output)
+		if transaction.transaction_id in self.pending_transaction_ids:
+			self.pending_transaction_ids.remove(transaction.transaction_id)
+
+
+	def resolve_conflicts(self,index):
 		#resolve correct chain
 		print('acquiring locks')
 		self.locks['chain'].acquire()
@@ -830,7 +862,7 @@ class Node:
 			
 			while True:
 				print('sending request to',max_node)
-				res=requests.get(max_node+'/blockchain/get')
+				res=requests.get(max_node+'/blockchain/get', params={'index': index})
 				if res.status_code==200:
 					res=res.json()
 					break
@@ -845,14 +877,35 @@ class Node:
 				# self.locks['valid_trans'].acquire()
 				# print('aquired locks')
 				chain=res['chain']
-				self.chain=[]
-				self.NBCs={}
-				for i in range(0,len(self.ring)):
-					self.NBCs[i]=[]
-				
+				#self.chain=[]
 				self.current_block=None
 				print('length of chain received: ',len(chain))
-				for i in range(0,len(chain)):
+
+				old_NBCs=copy.copy(self.NBCs)
+
+				j=index
+				while (chain[0]['hash']!=self.chain[j].hash):
+					j+=1
+				print(j)
+				k=0
+				while (k<len(chain) and j<len(self.chain) and chain[k]['hash']==self.chain[j].hash):
+					k+=1
+					j+=1
+					print(k,j)
+					
+				print(k)
+				if k<len(self.chain):
+					thrown_away=chain[k:]
+					self.chain=self.chain[:j]
+					for block in thrown_away:
+						block=self.process_block(block)
+						for trans in block.listOfTransactions:
+							self.restore_nbcs(trans)
+				#self.NBCs={}
+				
+				
+				
+				for i in range(k,len(chain)):
 					
 					processed_block=self.process_block(chain[i])
 					#print('process block:', processed_block.index)
@@ -885,7 +938,8 @@ class Node:
 								self.locks['NBCs'].release()
 								self.locks['valid_trans'].release()
 								print('error in genesis block')
-								self.resolve_conflicts()
+								self.NBCs=copy.copy(old_NBCs)
+								self.resolve_conflicts(index)
 								return 
 					else:
 						if not self.validate_block(processed_block,True):   # block not valid, this and all following will not be added to blockchain
@@ -900,7 +954,8 @@ class Node:
 								self.locks['NBCs'].release()
 								self.locks['valid_trans'].release()
 							print('error in block: ',i)
-							self.resolve_conflicts()
+							self.NBCs=copy.copy(old_NBCs)
+							self.resolve_conflicts(index)
 							return
 					self.chain.append(processed_block)
 
@@ -925,7 +980,8 @@ class Node:
 				self.locks['cur_block'].release()
 				self.locks['NBCs'].release()
 				self.locks['valid_trans'].release()
-				self.resolve_conflicts()
+				self.resolve_conflicts(index)
+				self.NBCs=copy.copy(old_NBCs)
 				return
 		self.update_ring_amounts()
 		try:
@@ -997,10 +1053,10 @@ class Node:
 		except:
 			return None
 
-	def send_blockchain_resolve_conflict(self):               # function to send blockchain_to_node
+	def send_blockchain_resolve_conflict(self,index):               # function to send blockchain_to_node
 		block_list=[]
 		self.locks['chain'].acquire()
-		for i in range(0,len(self.chain)):					 # create list of blocks in sendable form
+		for i in range(int(index),len(self.chain)):					 # create list of blocks in sendable form
 			block_list.append(self.chain[i].to_dict(True))
 		self.locks['chain'].release()
 		return block_list
