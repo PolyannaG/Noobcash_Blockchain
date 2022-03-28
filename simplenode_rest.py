@@ -225,6 +225,7 @@ def send_blockchain():
     print(index)
     response={'chain': node_instance.send_blockchain_resolve_conflict(index)}
     return jsonify(response),200
+    
 
 @app.route('/resolve_confict',methods=['GET'])
 def temp():
