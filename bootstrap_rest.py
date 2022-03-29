@@ -46,7 +46,7 @@ def initial():
 
     # create ring and register self
     address=binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8')
-    node_info={'node_id': node_instance.id,'contact': 'http://127.0.0.1:{}/'.format(port), 'address': address, 'public_key': address,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
+    node_info={'node_id': node_instance.id,'contact': 'http://'+node_address+':{}/'.format(port), 'address': address, 'public_key': address,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
     node_instance.ring.append(node_info)
     return
 
@@ -402,10 +402,12 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
     parser.add_argument('-n', '--nodes', default=5, type=int, help='number of nodes in ring')
+    parser.add_argument('-a-', '--address', default='127.0.0.1', type=str, help='node address')
 
     args = parser.parse_args()
     port = args.port
     node_number=args.nodes
+    node_address=args.address
     
     node_instance=Node()
     node_instance.node_number=node_number
@@ -414,4 +416,4 @@ if __name__ == '__main__':
     second_thread.start()
     second_thread.join()
         
-    app.run(host='127.0.0.1', port=port, use_reloader=False)
+    app.run(host=node_address, port=port, use_reloader=False)

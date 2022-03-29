@@ -2,7 +2,7 @@ from ast import excepthandler
 from binascii import a2b_hex
 import binascii
 from cmath import e
-from msvcrt import locking
+#from msvcrt import locking
 from platform import node
 from queue import Empty
 import random

@@ -4,7 +4,7 @@ from operator import index
 from os import abort
 from platform import node
 import re
-from turtle import pu
+#from turtle import pu
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -32,8 +32,8 @@ def initial():
     #initialize node : get registered to ring
     with app.app_context():
         pub_key= binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8')
-        dict_to_send={'public_key': pub_key,'address':pub_key, 'contact': 'http://127.0.0.1:{}/'.format(str(port))}
-        res=requests.post('http://127.0.0.1:5000/register', json=dict_to_send)
+        dict_to_send={'public_key': pub_key,'address':pub_key, 'contact': 'http://'+node_address[0]+':{}/'.format(str(port))}
+        res=requests.post('http://'+node_address[1]+':5000/register', json=dict_to_send)
         if (res.status_code==200):                                     # registration succeeded
             res=res.json()
             node_instance.id=res['node_id']                            # node id is the one given by bootstrap
@@ -429,8 +429,13 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
+    parser.add_argument('-a', '--address', default='127.0.0.1',type=str, help='node address')
+    parser.add_argument('-b', '--bootstrap', default='127.0.0.1', type=str, help='bootstrap address')
     args = parser.parse_args()
     port = args.port
+    node_address = []
+    node_address.append(args.address)
+    node_address.append(args.bootstrap)
    
     
 
@@ -438,4 +443,4 @@ if __name__ == '__main__':
     second_thread.start()
     second_thread.join()
             
-    app.run(host='127.0.0.1', port=port, use_reloader=False)
+    app.run(host=node_address[0], port=port, use_reloader=False)
