@@ -138,7 +138,7 @@ def print_data():
     for item in node_instance.transactions_created:
         if item not in node_instance.transactions_done:
             temp.append(item)
-    print(node_instance.transactions_read,len(node_instance.transactions_created),len(node_instance.transactions_done))
+    #print(node_instance.transactions_read,len(node_instance.transactions_created),len(node_instance.transactions_done))
     
     response={
         'blocks_mined': node_instance.blocks_mined,
@@ -158,7 +158,8 @@ def second():
                 all_trans.append((trans.transaction_id,trans.amount))
     for item in node_instance.transactions_created:
         if item not in all_trans:
-            print(item)
+            #print(item)
+            True
     return {}, 200
 
 
@@ -168,7 +169,7 @@ def read_file_trans():
     count = 0
     
     while True:
-        print('new transaction ', count)
+        #print('new transaction ', count)
         count += 1
     
         # Get next line from file
@@ -190,20 +191,20 @@ def read_file_trans():
         
             for node_ in node_instance.ring:
                 if node_['node_id']==id:
-                    print('receiver node address found')
+                    #print('receiver node address found')
                     receiver_address=node_['address']
                     #print(node_instance.wallet.public_key,receiver_address)
                     message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
                     if error_code!=200:
-                            print('error creating trans')
-                            print(message)
+                            #print('error creating trans')
+                            #print(message)
                             continue
-                    print('crrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr')
+                    #print('crrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr')
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
                     
                     break
         except:
-            print('error2 creating trans')
+            #print('error2 creating trans')
             continue
     
     file1.close()
@@ -219,7 +220,7 @@ def get_transactions():
     
     transactions = blockchain.get_transactions()
     response = {'transactions': transactions}
-    print(transactions)
+    #print(transactions)
     return jsonify(response), 200
 @app.route('/NBCs/print',methods=['GET'])
 def print_nbcs():
@@ -245,7 +246,7 @@ def get_blockhain_length():
 def send_blockchain():
     data=request.args
     index=data["index"]
-    print(index)
+    #print(index)
     response={'chain': node_instance.send_blockchain_resolve_conflict(index)}
     return jsonify(response),200
 
@@ -266,7 +267,7 @@ def register_node():
                 node_instance.NBCs[node_instance.current_id_count]=[]
 
                 if (node_instance.current_id_count==node_number-1):
-                    print('node ring full')
+                    #print('node ring full')
                     node_instance.send_data_to_nodes_give_blockchain()
                 else:                                                      # in the case of the last node of the ring, transaction will be added after ring,blockchain are sent, and block will be mined
                     # create transaction to transfer 100 NBCs
@@ -275,7 +276,7 @@ def register_node():
 
                     if error_code!=200:
                         return message, error_code
-                    print('after creation')
+                    #print('after creation')
 
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans,False),)).start()
 
@@ -292,23 +293,25 @@ def register_node():
         
 @app.route('/transactions/receive', methods=['POST'])
 def receive_transaction():
-    print('receive trans endpoint')
+    #print('receive trans endpoint')
     data=request.get_json()
     try:
         # get trasnaction data
         trans=process_transaction(data)
         if trans==None:
             return {'message': "Error in receiving transaction"}, 400
-        print("received transaction")
+        #print("received transaction")
         try:
             is_valid=node_instance.validate_transaction(trans)
             if (not is_valid):
-                print('not valid transaction')
+                #print('not valid transaction')
+                True
             else:
-                print("valid transaction")
+                #print("valid transaction")
                 node_instance.add_transaction_to_block(trans)
         except:
-            print("not valid transaction")
+            #print("not valid transaction")
+            True
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving transaction"}, 400
@@ -316,7 +319,7 @@ def receive_transaction():
 
 @app.route('/ring/get', methods=['POST'])
 def receive_ring():
-    print('receive ring endpoint')
+    #print('receive ring endpoint')
     data=request.get_json()
     
     try:
@@ -330,7 +333,7 @@ def receive_ring():
 
 @app.route('/blocks/receive', methods=['POST'])
 def receive_block():
-    print('receive block endpoint')
+    #print('receive block endpoint')
     data=request.get_json()
    # print('data received',data)
     try:
@@ -338,16 +341,16 @@ def receive_block():
         
         new_block=process_block(data)
         if new_block==None:
-            print('new block is none')
+            #print('new block is none')
             return {'message': "Error in receiving block"}, 400        
 
         # validate block
-        print('time to validate block')
+        #print('time to validate block')
         chain_extra.acquire()
         node_instance.locks['chain'].acquire()
         node_instance.locks['NBCs'].acquire()
         if node_instance.validate_block(new_block,True):
-            print('block hash valid',new_block.index)
+            #print('block hash valid',new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
             node_instance.time_to_append.append(time.time()-new_block.timestamp)
 
@@ -367,7 +370,8 @@ def receive_block():
             #print(node_instance.chain)
             #print(node_instance.NBCs)
         else:
-            print('block hash not valid')
+            #print('block hash not valid')
+            True
 
 
             # for trans in new_block.listOfTransactions:
