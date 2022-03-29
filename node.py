@@ -894,8 +894,8 @@ class Node:
 					print(k,j)
 					
 				print(k)
-				if k<len(self.chain):
-					thrown_away=chain[k:]
+				if j<len(self.chain):
+					thrown_away=self.chain[j:]
 					self.chain=self.chain[:j]
 					for block in thrown_away:
 						block=self.process_block(block)
