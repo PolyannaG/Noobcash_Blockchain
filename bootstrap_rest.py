@@ -332,6 +332,7 @@ def receive_block():
         print('time to validate block')
         chain_extra.acquire()
         node_instance.locks['chain'].acquire()
+        node_instance.locks['NBCs'].acquire()
         if node_instance.validate_block(new_block,True):
             print('block hash valid',new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
@@ -369,9 +370,13 @@ def receive_block():
         try:
             chain_extra.release()
             node_instance.locks['chain'].release()
+            node_instance.locks['NBCs'].release()
             
         except:
-            print()
+            try:
+               node_instance.locks['NBCs'].release()
+            except:
+                True
         # try:
         #     node_instance.locks['chain'].release()
         # except:

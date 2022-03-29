@@ -712,8 +712,12 @@ class Node:
 				# 	self.locks['chain'].release()
 				try:
 					self.locks['chain'].release()
+					self.locks['NBCs'].release()
 				except:
-					True
+					try:
+						self.locks['NBCs'].release()
+					except:
+						True
 
 
 				
@@ -732,8 +736,12 @@ class Node:
 					self.locks['conf'].release()
 					try:
 						self.locks['chain'].release()
+						self.locks['NBCs'].release()
 					except:
-						True
+						try:
+							self.locks['NBCs'].release()
+						except:
+							True
 					return False
 				print('-------------------starting resolve conf---------------------------')
 				index_to_ask=max(block.index-10,0)
@@ -896,9 +904,10 @@ class Node:
 				print(k)
 				if j<len(self.chain):
 					thrown_away=self.chain[j:]
+					print(thrown_away)
 					self.chain=self.chain[:j]
 					for block in thrown_away:
-						block=self.process_block(block)
+						#block=self.process_block(block)
 						for trans in block.listOfTransactions:
 							self.restore_nbcs(trans)
 				#self.NBCs={}

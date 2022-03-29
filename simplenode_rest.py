@@ -225,7 +225,7 @@ def send_blockchain():
     print(index)
     response={'chain': node_instance.send_blockchain_resolve_conflict(index)}
     return jsonify(response),200
-    
+
 
 @app.route('/resolve_confict',methods=['GET'])
 def temp():
@@ -362,6 +362,7 @@ def receive_block():
         print('time to validate block')
         chain_extra.acquire()
         node_instance.locks['chain'].acquire()
+        node_instance.locks['NBCs'].acquire()
         if node_instance.validate_block(new_block,True):
             print('block hash valid', new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
@@ -398,10 +399,15 @@ def receive_block():
             #         node_instance.pending_transaction_ids.remove(trans.transaction_id)
             # should call resolve confict
         try:
-            node_instance.locks['chain'].release()
-            chain_extra.release
-        except:
             chain_extra.release()
+            node_instance.locks['chain'].release()
+            node_instance.locks['NBCs'].release()
+            
+        except:
+            try:
+               node_instance.locks['NBCs'].release()
+            except:
+                True
         # try:
         #     chain_extra.release()
         #     node_instance.locks['chain'].release()
