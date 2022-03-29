@@ -119,6 +119,19 @@ def process_block(data):
 
 #.......................................................................................
 
+@app.route('/throughput',methods=['GET'])
+def return_time():
+    response={
+        'time_of_last_mine': node_instance.time_of_mine
+    }
+    return jsonify(response),200
+@app.route('/block_time',methods=['GET'])
+def return_append_time():
+    response={
+        'mean_time_to_append': sum(node_instance.time_to_append)/len(node_instance.time_to_append)
+    }
+    return jsonify(response),200
+
 @app.route('/data/print',methods=['GET'])
 def print_data():
     temp=[]
@@ -336,6 +349,7 @@ def receive_block():
         if node_instance.validate_block(new_block,True):
             print('block hash valid',new_block.index)
             node_instance.chain.append(new_block)        # block is valid, add to blockchain
+            node_instance.time_to_append.append(time.time()-new_block.timestamp)
 
             for trans in new_block.listOfTransactions:
                 if trans.transaction_id in node_instance.pending_transaction_ids:

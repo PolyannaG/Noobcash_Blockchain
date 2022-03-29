@@ -30,6 +30,9 @@ class Node:
 	def __init__(self):
 		#self.NBC=100;
 		##set
+		self.time_of_mine=None
+		self.time_to_append=[]
+
 
 		NBCs_lock=threading.RLock()
 		valid_transactions_lock=threading.RLock()
@@ -624,6 +627,7 @@ class Node:
 									
 			self.locks['chain'].release()
 		print('block mined')
+		self.time_of_mine=time.time()
 		self.blocks_mined+=1
 
 		# mining finished, time to broadcast block to all nodes (if we already have a completed ring)
