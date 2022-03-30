@@ -10,8 +10,8 @@ app.secret_key = b'_noobcash5#y2L"F2Blockchain9Q8z\n\xec]/'
 
 def get_contact(id):
     my_ip = socket.gethostbyname(socket.gethostname())
-    ring_url = "http://" + 'localhost:5000/ring/print'
-    #ring_url = "http://" + str(my_ip) + ':5000/ring/print'
+    #ring_url = "http://" + 'localhost:5000/ring/print'
+    ring_url = "http://" + str(my_ip) + ':5000/ring/print'
     ring = json.loads((requests.get(ring_url)).text)
     address = None
     for node in ring:
