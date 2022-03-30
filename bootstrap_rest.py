@@ -24,6 +24,7 @@ from blockchain import Blockchain
 from wallet import wallet
 from transaction import Transaction
 import copy
+#import logging
 
 ### REST API FOR BOOTSTRAP NODE
 
@@ -55,6 +56,8 @@ CORS(app)
 blockchain = Blockchain()
 chain_extra=threading.Lock()
 
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.ERROR)
 
 #......................................................................................
 
@@ -165,7 +168,7 @@ def second():
 
 @app.route('/file_transactions', methods=['GET'])
 def read_file_trans():
-    file1 = open('transactions{}.txt'.format(node_instance.id), 'r')
+    file1 = open('./5nodes/transactions{}.txt'.format(node_instance.id), 'r')
     count = 0
     
     while True:

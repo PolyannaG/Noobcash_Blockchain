@@ -23,6 +23,7 @@ from blockchain import Blockchain
 from wallet import wallet
 from transaction import Transaction
 import binascii
+#import logging
 ### REST API FOR THE REST OF THE NODES
 
 #def run_app(port):
@@ -50,6 +51,10 @@ CORS(app)
 blockchain = Blockchain()
 node_instance=Node()
 chain_extra=threading.Lock()
+
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.ERROR)
+
 #......................................................................................
 
 def process_transaction(item):
@@ -159,7 +164,7 @@ def second():
 
 @app.route('/file_transactions', methods=['GET'])
 def read_file_trans():
-    file1 = open('transactions{}.txt'.format(node_instance.id), 'r')
+    file1 = open('./5nodes/transactions{}.txt'.format(node_instance.id), 'r')
     count = 0
     
     while True:

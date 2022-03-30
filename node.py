@@ -42,7 +42,7 @@ class Node:
 		self.locks={'NBCs': NBCs_lock,'valid_trans': valid_transactions_lock,'cur_block': cur_block_lock,'chain': chain_lock, 'conf': conflict_lock}
 
 
-		self.block_capacity=1
+		self.block_capacity=5
 		
 		
 		self.chain=[]
@@ -528,7 +528,9 @@ class Node:
 		#if enough transactions  mine
 		self.locks['chain'].acquire()
 		self.locks['cur_block'].acquire()
+		is_first = False
 		if self.current_block==None:
+			is_first = True
 			#print("creating new block",transaction)
 			
 			if self.chain==[]:                                            # case of genesis block
@@ -558,8 +560,9 @@ class Node:
 		else:
 			#print('to mineeeeeeeeeee')
 			self.locks['cur_block'].release()
-			t=threading.Thread(target=asyncio.run, args=(self.check_for_mine(),))
-			t.start()
+			if is_first:
+				t=threading.Thread(target=asyncio.run, args=(self.check_for_mine(),))
+				t.start()
 		
 		return
 
@@ -770,7 +773,8 @@ class Node:
 				
 				if self.validate_transaction(trans,from_resolve_coflict):
 					#print('valid trans')
-					self.update_nbcs(trans,True)
+					#self.update_nbcs(trans,True)
+					continue
 				else:
 					#print('not valid trans')
 					try:
@@ -778,7 +782,8 @@ class Node:
 					except:
 						True
 					return False
-				
+			for trans in block.listOfTransactions:
+				self.update_nbcs(trans,True)
 			self.update_ring_amounts()
 			#if not from_resolve_coflict:
 				#self.locks['chain'].release()
