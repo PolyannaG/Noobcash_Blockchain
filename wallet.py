@@ -28,7 +28,7 @@ class wallet:
 		self.public_key=private_key.publickey().exportKey(format='PEM')    # get public key object that is the pair of the private and export public key from object
 		sender_address=binascii.b2a_hex(self.public_key).decode('utf-8')
 		self.address=sender_address                  					   # the address of the user is the public key
-		self.transactions=[]						                       # no transactions yet						
+								                       						
 
 
 	def balance(self,NBCs_list):										   # parameter is list of unsent UTXOs, returns total NBCs

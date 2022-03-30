@@ -13,7 +13,6 @@ from flask import Flask, jsonify, request, render_template
 import time
 import random
 from base64 import b64decode
-#from wallet import wallet          # will be removed, testing only
 
 
 class Transaction:

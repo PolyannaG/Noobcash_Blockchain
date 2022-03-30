@@ -283,7 +283,6 @@ def print_data():
         'transactions_read': node_instance.transactions_read,
         'transactions_created': node_instance.transactions_created,
         'transactions_done': node_instance.transactions_done,
-        'transactions invalid': node_instance.transactions_denied,
         'in_created_not_done': temp    }
     return jsonify(response), 200
 
