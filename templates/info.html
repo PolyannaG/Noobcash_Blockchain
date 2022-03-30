@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+
+<style>
+    .card {
+        float: right;
+        padding:0;
+        margin:0;
+        background-color: aliceblue;
+        text-align: center;
+
+        margin-left: 2.5%;
+        margin-left: 2.5%;
+        margin-top: 80px;
+        width: 60%;
+        height: 20%;
+    }
+
+    .card-img-top {
+        width: 100%;
+    }
+</style>
+
+<body style="background-image: url(/static/images/background.jpg); background-repeat: no-repeat; background-size: cover; ">
+
+    {% include 'topnav.html' %}
+    {% include 'navbar.html' %}
+
+    <div class="card" style="width: 18rem; margin-right: 9%;">
+        <img class="card-img-top" src="https://avatars.githubusercontent.com/u/75030581?s=460&u=b7a5810e1010a96647ad4a61d4da5b54ac3cf3da&v=4" alt="Card image cap">
+        <div class="card-body" style ="margin-top:10px; margin-bottom: 10px;" >
+          <a href=https://github.com/LiagkaAikaterini target="_blank" class="btn btn-primary">Λιάγκα Αικατερίνη (el17208)</a>
+        </div>
+    </div>
+
+    <div class="card" style="width: 18rem;">
+        <img class="card-img-top" src="/static/images/stela.jpg" alt="Card image cap">
+        <div class="card-body" style ="margin-top:10px; margin-bottom: 10px;" >
+          <a href="https://github.com/stelazr" target="_blank" class="btn btn-primary">Ζάρα Στέλλα (el17154)</a>
+        </div>
+    </div>
+
+    <div class="card" style="width: 18rem;">
+    <img class="card-img-top" src="/static/images/polyanna.png" alt="Card image cap">
+    <div class="card-body" style ="margin-top:10px; margin-bottom: 10px;">
+        <a href="https://github.com/PolyannaG" target="_blank" class="btn btn-primary">Πολυτίμη-Άννα Γκότση (el17201)</a>
+    </div>
+    </div>
+
+</body>
+</html>

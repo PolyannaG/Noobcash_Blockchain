@@ -118,6 +118,146 @@ def process_block(data):
 
 #.......................................................................................
 
+#------------------------------------------------------FRONTEND------------------------------------------------------
+@app.route("/homepage")
+def front_homepage():
+    data = {"id": node_instance.id}
+    return data
+
+@app.route("/info")
+def front_info():
+    data = {"id": node_instance.id}
+    return data
+
+@app.route("/transaction", methods = ['GET', 'POST'])
+def front_create_transaction():
+    return_data = {}
+    return_data["id"] = node_instance.id
+
+    if request.method == 'POST':
+
+        req = request.get_json()
+        receiver_address = req["address"]
+        amount = req["amount"]
+
+        if (node_instance.wallet.address == receiver_address):
+            return_data["message"] = "The sender address is the same as the receiver address. Please select a different receiver address."
+            return return_data
+            
+        try:
+            message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+            if error_code!=200:
+                msg = str(error_code) + " " + str(message)
+                return_data["message"] = msg
+            else:
+                threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                return_data["message"] = "The transaction was conducted successfully"
+            return return_data
+        
+        except:
+            return_data["message"] = 'Error while creating transaction'
+            return return_data
+ 
+    else:
+        return return_data
+
+
+@app.route("/view")
+def front_view():
+    last_block = node_instance.view_transaction()
+    data = {}
+    
+    if last_block == None:
+        data["none"] = True
+        data["id"] = node_instance.id
+    else:
+        index = last_block["index"]
+        hash = last_block["hash"]
+        t = last_block["timestamp"]
+        transactions_res = []
+        for trans in last_block["list_of_transactions"]:
+            dict = {}
+
+            dict["id"] = trans["transaction_id"]
+            dict["amount"] = trans["amount"]
+            sender_addr = trans["sender_address"]
+            receiver_addr = trans["receiver_address"]
+
+            for node_ in node_instance.ring:
+                if node_['address'] == sender_addr:
+                    dict["sender_id"] = node_['node_id']
+                if node_['address'] == receiver_addr:
+                    dict["receiver_id"] = node_['node_id']
+
+            transactions_res.append(dict)
+            
+            data["none"] = False
+            data["id"]=node_instance.id
+            data["index"] = index
+            data["hash"] = hash
+            data["t"] = t
+            data["transactions"] = transactions_res
+        
+    return data
+
+@app.route("/balance")
+def front_balance():
+    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])
+    data = {}
+    data["id"] = node_instance.id
+    data["balance"] = curr_balance
+    return data
+
+@app.route("/help")
+def front_help():     
+    data = {"id": node_instance.id}
+    return data
+
+#--------------------------------------------------------------------------------------------------------------------
+
+#---------------------------------------------------------CLI---------------------------------------------------------
+@app.route("/cli_transaction", methods = ['POST'])
+def cli_create_transaction():
+    receiver_address = request.form.to_dict()['address']
+    amount = int(request.form.to_dict()['amount'])
+
+    if (node_instance.wallet.address == receiver_address):
+        return "The sender id is the same as the receiver id. Please select a different receiver id."
+
+    try:
+        message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+        if error_code!=200:
+            msg = str(error_code) + " " + str(message)
+            return msg
+        else:
+            threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+            return "The transaction was conducted successfully"
+    
+    except:
+        return "Error while creating transaction"
+
+@app.route("/cli_view", methods = ['GET'])
+def cli_view():
+    last_block = node_instance.view_transaction()
+    
+    if last_block == None:
+        return "There is no valid block in the blockchain yet"
+    else:
+        res = "\n"
+        count = 1
+        for trans in last_block["list_of_transactions"]:
+            transaction = (f"Transaction {count}")
+            count += 1
+            res = res + transaction + "\n\n" + str(trans) + "\n\n"
+        return res
+
+@app.route("/cli_balance", methods = ['GET'])
+def cli_balance():
+    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])
+    return str(curr_balance)
+
+#---------------------------------------------------------------------------------------------------------------------
+
 @app.route('/throughput',methods=['GET'])
 def return_time():
     response={

@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+    <!--
+<style>
+    /* Add a black background color to the top navigation */
+    .topnav {
+    background-color: rgb(128, 72, 173);
+    overflow: hidden;
+    }
+
+    /* Style the links inside the navigation bar */
+    .topnav a {
+    float: left;
+    color: #f2f2f2;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    font-size: 17px;
+    }
+
+    /* Change the color of links on hover */
+    .topnav a:hover {
+    background-color: rgb(221, 221, 221);
+    color: black;
+    align-items: right;
+    }
+
+    /* Add a color to the active/current link */
+    .topnav a.active {
+    background-color: rgb(63, 11, 105);
+    color: white;
+    }
+</style>
+-->
+
+<style>
+    /* List style */
+    ul {
+        list-style-type: none;
+        /*background-color: rgb(128, 72, 173);*/
+        background-color: rgba(39, 165, 159, 0.349);
+        padding:0;
+        margin: 0;
+        margin-left: 5%;
+        position: relative;
+        float: left;
+
+        width: 15%;
+        height: 90%;
+        background:rgba(255,255,255,0.5);
+    }
+    /* Items in the list style */
+    li a {
+        display: block;
+        color: #000;
+        padding: 8px 16px;
+        text-decoration: none;
+        text-align: center;
+        font-size: 25px;
+        float:top;
+    }
+
+    /* Change the link color on hover */
+    li a:hover {
+        background-color: rgb(1, 107, 137);
+        color: black;
+    }
+
+    li a:active {
+        background-color: rgb(0,64,85);
+        color: white;
+    }
+
+</style>
+
+<body style="background-color: rgba(39, 165, 159, 0.349); margin-top: 80px;">
+
+    <ul style="margin-top: 80px;">
+        <li>
+            <a  class="active" href="{{ url_for('homepage', myid = data[0]) }}">
+                Home
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('create_transaction_front', myid = data[0]) }}">
+                New Transaction
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('view', myid = data[0]) }}">
+                View
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('balance', myid = data[0]) }}">
+                Balance
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('help', myid = data[0]) }}">
+                Help
+            </a>
+        </li>
+    </ul>
+
+  <!--
+    <div class="topnav">
+        <a class="active" href="#home">Home</a>
+        <a href="#new">New Transaction</a>
+        <a href="#view">View</a>
+        <a href="#balance">Balance</a>
+        <a href="#help">Help</a>
+    </div>
+-->
+
+</body>
+</html>

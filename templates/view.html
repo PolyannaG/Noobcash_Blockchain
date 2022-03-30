@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+
+<style>
+    h3 {
+        float: right;
+        padding:0;
+        margin:0;
+        color: aliceblue;
+
+        text-align: center;
+
+        margin-left: 5%;
+        margin-right: 5%;
+        width: 70%;
+        height: 20%;
+    }
+
+    table {
+        float: right;
+        padding:0;
+        margin:0;
+        border:1px solid black;
+        color: aliceblue;
+
+        text-align: center;
+
+        margin-left: 5%;
+        margin-right: 5%;
+        margin-top: 2px;
+        width: 70%;
+    }
+
+    td {
+        border:1px solid aliceblue;;
+        color:beige;
+    }
+
+</style>
+
+<body style="background-image: url(/static/images/background.jpg); background-repeat: no-repeat; background-size: cover;">
+
+    {% include 'topnav.html' %}
+    {% include 'navbar.html' %}
+
+    <h3 style="margin-top: 80px;">
+        The last transactions that have been conducted are displayed below. <br>
+        More specifically, these transactions are the ones contained in the last valid block of the current blockchain.
+    </h3>
+    <h3 style = "margin-top: 2%;">
+        <u>Last valid block's information</u> <br>
+    </h3>
+    <table>
+        <!-- Table headers -->
+        <tr style="color: rgb(0, 0, 0); background-color: rgba(1, 107, 137, 0.664);">    
+            <td><b>Hash</b></td>
+            <td><b>Index</b></td>
+            <td><b>Creation Time</b></td>
+        </tr>
+
+        <tr>
+            <td>{{data[2]}}</td>
+            <td>{{data[1]}}</td>
+            <td>{{data[3]}}</td>
+        </tr>
+    </table>
+    <h3 style = "margin-top: 1%;">
+        <u>Transactions in the above block</u> <br>
+    </h3>
+    <table>
+        <!-- Table headers -->
+        <tr style="color: rgb(0, 0, 0); background-color: rgba(1, 107, 137, 0.664);">    
+            <td><b>Transaction ID</b></td>
+            <td><b>Sender ID</b></td>
+            <td><b>Receiver ID</b></td>
+            <td><b>Amount</b></td>
+        </tr>
+              
+        <!-- For loop logic of jinja template -->
+        {%for trans in data[4]%}
+
+        <!-- table rows -->
+        <tr>
+            <td>{{trans["id"]}}</td>
+            <td>{{trans["sender_id"]}}</td>
+            <td>{{trans["receiver_id"]}}</td>
+            <td>{{trans["amount"]}}</td>
+          
+        {%endfor%}
+          
+        </tr>
+          
+    </table>
+
+</body>
+</html>

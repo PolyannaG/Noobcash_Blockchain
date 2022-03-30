@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+
+<style>
+    p {
+        float: left;
+        padding:0;
+        margin:0;
+        color: aliceblue;
+
+        text-align: left;
+        margin-top: 3%;
+
+        margin-left: 5%;
+        margin-right: 5%;
+        width: 70%;
+        height: 20%;
+    }
+    h3 {
+        float: right;
+        padding:0;
+        margin:0;
+        color: aliceblue;
+
+        text-align: center;
+        margin-top: 80px;
+
+        margin-left: 5%;
+        margin-right: 5%;
+        width: 70%;
+        height: 20%;
+    }
+
+</style>
+
+<body style="background-image: url(/static/images/background.jpg); background-repeat: no-repeat; background-size: cover;">
+
+    {% include 'topnav.html' %}
+    {% include 'navbar.html' %}
+
+    <h3>
+        This page contains explanatory information about the main website features, which can be seen in the vertical menu bar.
+    </h3>
+    <p>
+        <u><b>Home</b></u> <br>
+        Leads to the homepage of the website.
+        <br><br>
+        <u><b>New Transaction</b></u> <br>
+        Leads to a page where user can create a new transaction. 
+        Type the recipient node's address (text) in the first input box
+        and the amount of coins you wish to send (integer) on the second input box, both inputs are required.
+        Then, by pressing the button "Create Transaction", a new transaction is created and 
+        the specified amount of coins will be sent to the specified recipient node. 
+        <br>
+        If the transaction was created successfully the message "The transaction was conducted successfully" will appear, 
+        otherwise, if an error occured, an appropriate message will appear that will guide the user to correct their mistake.
+        <br><br>
+        <u><b>View</b></u> <br>
+        Leads to a page which displays all the transactions contained in the last valid block of the current blockchain. 
+        Some information about the last valid block (like its hash) are also displayed in this page. 
+        <br>
+        If there is no block in the blockchain an appropriate message appears.
+        <br><br>
+        <u><b>Balance</b></u> <br>
+        Leads to a page where the balance of the current node's wallet is displayed.
+        <br><br>
+        <u><b>Help</b></u> <br>
+        Current Page
+    </p>
+
+
+</body>
+</html>

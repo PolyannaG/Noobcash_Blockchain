@@ -125,13 +125,21 @@ class Node:
 		
 		else:   
 			#print('creating transaction')                        									  # usual case
-			
+			sender_id = None
 			for node_item in self.ring:																  # check that node is indeed part of the ring
 				if (node_item['address']==sender):
 					sender_id=node_item['node_id']
-			#print(sender_id)
+
+			receiver_id = None
+			for node_item in self.ring:																  # check that node is indeed part of the ring
+				if (node_item['address']==receiver):
+					receiver_id=node_item['node_id']
+
+
 			if sender_id==None:						
 				return "Sender not part of ring." ,400, None
+			elif receiver_id == None:
+				return "Receiver not part of ring." ,400, None
 			elif sender_id!=self.id:
 				#print(self.id, sender_id)																  # check that the node is indeed the current one (for safety, should always be true)
 				return "1Sender not current node, you do not own this wallet.", 400, None
@@ -1083,3 +1091,11 @@ class Node:
 		return block_list
 
 
+	def view_transaction(self):
+		my_chain = self.chain
+		if my_chain == []:
+			return None
+		else:
+			last_valid_block = my_chain[-1]
+			res = last_valid_block.to_dict(True)
+			return res
