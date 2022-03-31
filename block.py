@@ -5,23 +5,19 @@ from dotenv import load_dotenv
 
 class Block:
 	def __init__(self,index,previousHash,nonce,capacity=5):
-		##se
-		load_dotenv()
-		self.index=index
-		self.previousHash=previousHash
-		self.timestamp=time.time()
-		self.hash=None
-		self.nonce=nonce
-		self.listOfTransactions=[]
-		self.capacity=capacity
-		self.difficulty=int(os.getenv('DIFFICULTY'))
+		load_dotenv()                       # load environment variables
+		self.index=index                    # block's index in blockchain
+		self.previousHash=previousHash      # previous block's in blockchain hash
+		self.timestamp=time.time()          # time of creation
+		self.hash=None						# block hash
+		self.nonce=nonce                    # block's nonce number
+		self.listOfTransactions=[]          # transactions of the block
+		self.capacity=capacity              # max number of transactions the block can have
+		self.difficulty=int(os.getenv('DIFFICULTY'))   # blockchain's difficulty (number of zeros in the beginning)
 		
 	
-	def to_dict(self,add_hash=False):
-		"""
-        Convert block info to dictionary
-        """
-		if not add_hash:
+	def to_dict(self,add_hash=False):       # function to convert block to dictionary from object
+		if not add_hash:				    # do not add the block hash in the dictionary
 			transactions=[]
 			for i in range(0, len(self.listOfTransactions)):
 				transactions.append(self.listOfTransactions[i].to_dict(True))
@@ -31,7 +27,7 @@ class Block:
 						'list_of_transactions' : transactions,
 						'nonce' : self.nonce,
 						})
-		else:
+		else:                              # add the block hash
 			transactions=[]
 			for i in range(0, len(self.listOfTransactions)):
 				transactions.append(self.listOfTransactions[i].to_dict(True))
@@ -43,21 +39,12 @@ class Block:
 						'hash': self.hash,
 						'capacity': self.capacity
 						})
-			
 		return block_dict
 
 
-	def myHash(self):
-		#calculate self.hash
+	def myHash(self):                    # function to calculate block's hash
 		value_to_hash=str(self.to_dict())
 		self.hash=SHA.new(value_to_hash.encode('utf-8'))
 		self.hash=self.hash.hexdigest()
-		#print('self hash',self.hash)
 		return self.hash
-		
-
-
-	# def add_transaction(self, transaction, blockchain):
-	# 	#add a transaction to the block
-	# 	self.listofTransactions.append(transaction)
 		

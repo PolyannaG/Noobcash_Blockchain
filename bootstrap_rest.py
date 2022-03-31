@@ -7,7 +7,6 @@ from argparse import ArgumentParser
 import asyncio
 import binascii
 from node import Node
-from blockchain import Blockchain
 from transaction import Transaction
 import copy
 
@@ -15,23 +14,15 @@ import copy
 
 ### REST API FOR BOOTSTRAP NODE
 
-# def run_app(port):
-#     app.run(host='127.0.0.1', port=port)
 
 def initial():
     #initialize bootstrap node
     
-    node_instance.id=0
-
-    # create genesis block
-    #genesis_block=node_instance.create_new_block(1,1,0)                                                                 # create genesis block
+    node_instance.id=0  # set node id
     _,_,initial_transaction=node_instance.create_transaction(sender='0', receiver=node_instance.wallet.public_key, amount=100*node_number)           # create initial transaction
-    #node_instance.NBCs[node_instance.id]=[(str(uuid.uuid1()),initial_transaction.transaction_id,binascii.b2a_hex(initial_transaction.receiver_address).decode('utf-8'),initial_transaction.amount)]
-    #initial_transaction.outputs=node_instance.NBCs[node_instance.id]
     node_instance.NBCs[node_instance.id]=copy.copy(initial_transaction.outputs)
-    node_instance.add_transaction_to_block(initial_transaction)
-    #node_instance.chain.append(genesis_block)      # add genesis block to blockchain
-
+    node_instance.add_transaction_to_block(initial_transaction)                     # add initial transaction to genesis block
+    
     # create ring and register self
     address=binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8')
     node_info={'node_id': node_instance.id,'contact': 'http://'+node_address+':{}/'.format(port), 'address': address, 'public_key': address,  'balance': 100*node_number}    # IP ADDRESS MISSING!!
@@ -40,15 +31,11 @@ def initial():
 
 app = Flask(__name__)
 CORS(app)
-blockchain = Blockchain()
-chain_extra=threading.Lock()
-
-#log = logging.getLogger('werkzeug')
-#log.setLevel(logging.ERROR)
+chain_extra=threading.Lock()   # lock used my node
 
 #....................................................................................................................
 
-def process_transaction(item):
+def process_transaction(item):                                  # function to convert transaction from dictionary form to object instance
     try:
         sender_address=item['sender_address']
         receiver_address=item['receiver_address']
@@ -81,7 +68,7 @@ def process_transaction(item):
     except:
         return None
 
-def process_block(data):
+def process_block(data):                                           # function to convert block from dioctionary to object instance
     try:
         previous_hash=data['previous_hash']
         index=data['index']
@@ -265,26 +252,27 @@ def cli_balance():                                          # fetch current node
 
 #---------------------------------------------------------------------------------------------------------------------
 
-@app.route('/throughput',methods=['GET'])
+#-------------------------------------------BACKEND REST API----------------------------------------------------------
+
+@app.route('/throughput',methods=['GET'])                      # returns time that the last mine occured
 def return_time():
     response={
         'time_of_last_mine': node_instance.time_of_mine
     }
     return jsonify(response),200
-@app.route('/block_time',methods=['GET'])
+@app.route('/block_time',methods=['GET'])                     # returns mean time from creation of block until its addition to the blockchain
 def return_append_time():
     response={
         'mean_time_to_append': sum(node_instance.time_to_append)/len(node_instance.time_to_append)
     }
     return jsonify(response),200
 
-@app.route('/data/print',methods=['GET'])
+@app.route('/data/print',methods=['GET'])                     # prints some general data about the transations of the node
 def print_data():
     temp=[]
     for item in node_instance.transactions_created:
         if item not in node_instance.transactions_done:
             temp.append(item)
-    #print(node_instance.transactions_read,len(node_instance.transactions_created),len(node_instance.transactions_done))
     
     response={
         'blocks_mined': node_instance.blocks_mined,
@@ -294,7 +282,7 @@ def print_data():
         'in_created_not_done': temp    }
     return jsonify(response), 200
 
-@app.route('/second',methods=['GET'])
+@app.route('/second',methods=['GET'])                        # second endpoint for general data about the transactions of the node, prints transactions created by this node but not added to blockchain
 def second():
     all_trans=[]
     for block in node_instance.chain:
@@ -303,24 +291,21 @@ def second():
                 all_trans.append((trans.transaction_id,trans.amount))
     for item in node_instance.transactions_created:
         if item not in all_trans:
-            #print(item)
+            print(item)
             True
     return {}, 200
 
 
-@app.route('/file_transactions', methods=['GET'])
+@app.route('/file_transactions', methods=['GET'])          # when called, the node reads the transactions of the file transactions{node id}.txt
 def read_file_trans():
     file1 = open('./5nodes/transactions{}.txt'.format(node_instance.id), 'r')
     count = 0
     
     while True:
-        #print('new transaction ', count)
         count += 1
     
         # Get next line from file
-        line = file1.readline()
-        #time.sleep(3)
-    
+        line = file1.readline()   
         # if line is empty
         # end of file is reached
         if not line:
@@ -334,22 +319,16 @@ def read_file_trans():
         try:
             node_instance.transactions_read+=1
         
-            for node_ in node_instance.ring:
+            for node_ in node_instance.ring:     # find node id
                 if node_['node_id']==id:
-                    #print('receiver node address found')
                     receiver_address=node_['address']
-                    #print(node_instance.wallet.public_key,receiver_address)
-                    message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+                    message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)   # create transaction
                     if error_code!=200:
-                            #print('error creating trans')
-                            #print(message)
                             continue
-                    #print('crrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr')
-                    threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                    threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()    # broadcast transaction
                     
                     break
         except:
-            #print('error2 creating trans')
             continue
     
     file1.close()
@@ -358,44 +337,58 @@ def read_file_trans():
 #.......................................................................................
 
 
-# get all transactions in the blockchain
-
-@app.route('/transactions/print', methods=['GET'])
-def get_transactions():
-    
-    transactions = blockchain.get_transactions()
-    response = {'transactions': transactions}
-    #print(transactions)
-    return jsonify(response), 200
-@app.route('/NBCs/print',methods=['GET'])
+@app.route('/NBCs/print',methods=['GET'])             # returns node's list of UTXOs
 def print_nbcs():
     response=node_instance.NBCs
     return jsonify(response), 200
-@app.route('/blockchain/print',methods=['GET'])
+
+@app.route('/blockchain/print',methods=['GET'])       # prints the blockchain
 def print_blockhain():
     response=[]
     for item in node_instance.chain:
         response.append(item.to_dict(True))
     return jsonify(response),200
-@app.route('/ring/print',methods=['GET'])
+
+@app.route('/ring/print',methods=['GET'])             # prints the ring
 def print_ring():
     node_instance.update_ring_amounts()
     return jsonify(node_instance.ring),200
 
-@app.route('/blockchain/length',methods=['GET'])
+@app.route('/blockchain/length',methods=['GET'])      # prints blockchain's length
 def get_blockhain_length():
     response={'length': len(node_instance.chain)}
     return jsonify(response),200
 
-@app.route('/blockchain/get', methods=['GET'])
+@app.route('/blockchain/get', methods=['GET'])        # returns the blockchain after a specified block index
 def send_blockchain():
     data=request.args
     index=data["index"]
-    #print(index)
     response={'chain': node_instance.send_blockchain_resolve_conflict(index)}
     return jsonify(response),200
 
-@app.route('/register',methods=['POST'])
+
+@app.route('/transactions/create',methods=['POST'])   # created new transaction
+def create_transaction():
+    data=request.get_json()
+    try:
+        id=data['id']                                 # get receiver's id in ring
+        amount=data['amount']                         # get amount
+        for node_ in node_instance.ring:
+            if node_['node_id']==id:
+                receiver_address=node_['address']
+                message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
+                if error_code!=200:
+                        return message, error_code
+                threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+                break
+        else:
+            return {'message': 'Error creating transaction'}, 404
+        return {'message': 'Created transaction'},200
+    except:
+        return {'message': 'Error creating transaction'}, 404
+
+
+@app.route('/register',methods=['POST'])             # when called, bootstrap registers calling node to ring
 def register_node():
     if (node_instance.current_id_count==node_number-1):   # check if we already have n nodes
         return {'message': 'No more nodes can be added'}, 400
@@ -403,7 +396,6 @@ def register_node():
         try: 
             
             # get data for register and register node
-
             data=request.get_json()
             public_key=data['public_key']
             address=data['address']
@@ -411,139 +403,96 @@ def register_node():
             if node_instance.register_node_to_ring(public_key,address,contact):
                 node_instance.NBCs[node_instance.current_id_count]=[]
 
-                if (node_instance.current_id_count==node_number-1):
-                    #print('node ring full')
+                if (node_instance.current_id_count==node_number-1):        # ring full, time to send ring and blockchain to nodes
                     node_instance.send_data_to_nodes_give_blockchain()
                 else:                                                      # in the case of the last node of the ring, transaction will be added after ring,blockchain are sent, and block will be mined
                     # create transaction to transfer 100 NBCs
                     message,error_code,trans=node_instance.create_transaction(node_instance.wallet.address,address,100)
-                    
-
                     if error_code!=200:
                         return message, error_code
-                    #print('after creation')
-
+                    # transaction created, time to broadcast (it will be sent only to bootstrap)
                     threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans,False),)).start()
-
-                    #node_instance.add_transaction_to_block(trans)
                     
                 return {'message:': 'Registed to ring', 'node_id': node_instance.current_id_count}, 200
                 
-            
             else:
                 return {'message:': 'Error registering node, try again.'}, 404
         except e:
             print(e)
             return {'message': 'Invalid register info'}, 400 
         
-@app.route('/transactions/receive', methods=['POST'])
+@app.route('/transactions/receive', methods=['POST'])        # endpoint called when a transaction is sent to the node
 def receive_transaction():
-    #print('receive trans endpoint')
     data=request.get_json()
     try:
         # get trasnaction data
         trans=process_transaction(data)
         if trans==None:
             return {'message': "Error in receiving transaction"}, 400
-        #print("received transaction")
         try:
-            is_valid=node_instance.validate_transaction(trans)
-            if (not is_valid):
-                #print('not valid transaction')
+            is_valid=node_instance.validate_transaction(trans)    # validate transaction
+            if (not is_valid):                                    # not valid, no addition to block
                 True
-            else:
-                #print("valid transaction")
+            else:                                                 # valid, will be added to a block
                 node_instance.add_transaction_to_block(trans)
         except:
-            #print("not valid transaction")
             True
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving transaction"}, 400
 
 
-@app.route('/ring/get', methods=['POST'])
+@app.route('/ring/get', methods=['POST'])                      # endpoint called for a node to receive a new ring
 def receive_ring():
-    #print('receive ring endpoint')
     data=request.get_json()
-    
     try:
-        # get trasnaction data
-        
+        # get ring data
         node_instance.ring=data['ring']
         return {'message': "Received"}, 200
     except:
         return {'message': "Error in receiving ring"}, 400
 
 
-@app.route('/blocks/receive', methods=['POST'])
+@app.route('/blocks/receive', methods=['POST'])              # endpoint called when a block is sent to the node
 def receive_block():
-    #print('receive block endpoint')
     data=request.get_json()
-   # print('data received',data)
     try:
         # get block data
-        
-        new_block=process_block(data)
+        new_block=process_block(data)                        # convert to object
         if new_block==None:
-            #print('new block is none')
             return {'message': "Error in receiving block"}, 400        
 
         # validate block
-        #print('time to validate block')
         chain_extra.acquire()
         node_instance.locks['chain'].acquire()
         node_instance.locks['NBCs'].acquire()
         if node_instance.validate_block(new_block,True):
-            #print('block hash valid',new_block.index)
-            node_instance.chain.append(new_block)        # block is valid, add to blockchain
-            node_instance.time_to_append.append(time.time()-new_block.timestamp)
+            node_instance.chain.append(new_block)                                                # block is valid, add to blockchain
+            node_instance.time_to_append.append(time.time()-new_block.timestamp)                 # add time between creation and addition to blockchain to list
 
-            for trans in new_block.listOfTransactions:
-                if trans.transaction_id in node_instance.pending_transaction_ids:
+            for trans in new_block.listOfTransactions:                                           # for all its transactions:
+                if trans.transaction_id in node_instance.pending_transaction_ids:                # if it is one of the node's pending:
 
-                    for input_ in trans.inputs:
+                    for input_ in trans.inputs:                                                  # remove used NBCs from set of NBCs used as inputs in pending transactions
                         if input_ in node_instance.used_nbcs:
                             node_instance.used_nbcs.remove(input_)
-                    for output_ in trans.outputs:
+                    for output_ in trans.outputs:                                                # remove outputs from set of excpected outputs to be received
                         if output_ in node_instance.get_back:
                             node_instance.get_back.remove(output_)
 
-                    node_instance.pending_transaction_ids.remove(trans.transaction_id)
-                    node_instance.transactions_done.append((trans.transaction_id,trans.amount))
-                    
-            #print(node_instance.chain)
-            #print(node_instance.NBCs)
-        else:
-            #print('block hash not valid')
-            True
-
-
-            # for trans in new_block.listOfTransactions:
-            #     if trans.transaction_id in node_instance.pending_transaction_ids:
-            #         print('------------------------------------------------------------------------------------------------')
-            #         for input_ in trans.inputs:
-            #             if input_ in node_instance.used_nbcs:
-            #                 node_instance.used_nbcs.remove(input_)
-            #         for output_ in trans.outputs:
-            #             if output_ in node_instance.get_back:
-            #                 node_instance.get_back.remove(output_)
-            #         node_instance.pending_transaction_ids.remove(trans.transaction_id)
-                    
+                    node_instance.pending_transaction_ids.remove(trans.transaction_id)           # remove from pending transactions
+                    node_instance.transactions_done.append((trans.transaction_id,trans.amount))  # add to list of transctions done
+        else:                                                                                    # block not valid
+            True    
         try:
             chain_extra.release()
             node_instance.locks['chain'].release()
             node_instance.locks['NBCs'].release()
-            
         except:
             try:
                node_instance.locks['NBCs'].release()
             except:
                 True
-        # try:
-        #     node_instance.locks['chain'].release()
-        # except:
-        #     return {'message': "Received"}, 200
         return {'message': "Received"}, 200
             
     except e:
@@ -554,18 +503,15 @@ def receive_block():
 
 
 
-
-
-
-#run it once for every node
+# main function, runs in the beggining
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
-    parser.add_argument('-n', '--nodes', default=5, type=int, help='number of nodes in ring')
-    parser.add_argument('-a', '--address', default='127.0.0.1', type=str, help='node address')
+    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')        # port the app runs on
+    parser.add_argument('-n', '--nodes', default=5, type=int, help='number of nodes in ring')    # number of nodes in ring
+    parser.add_argument('-a', '--address', default='127.0.0.1', type=str, help='node address')   # bootstrap's local ip address
 
     args = parser.parse_args()
     port = args.port
