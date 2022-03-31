@@ -1,29 +1,16 @@
-import argparse
 from cmath import e
-
-from hashlib import new
-
-from operator import index
-from platform import node
-from urllib import response
-import requests
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
 import time
 from argparse import ArgumentParser
-import argparse
 import asyncio
 import binascii
-import uuid
-
-
-import block
 from node import Node
 from blockchain import Blockchain
-from wallet import wallet
 from transaction import Transaction
 import copy
+
 #import logging
 
 ### REST API FOR BOOTSTRAP NODE
@@ -59,7 +46,7 @@ chain_extra=threading.Lock()
 #log = logging.getLogger('werkzeug')
 #log.setLevel(logging.ERROR)
 
-#......................................................................................
+#....................................................................................................................
 
 def process_transaction(item):
     try:
@@ -118,66 +105,78 @@ def process_block(data):
     except:
         return None
 
-#.......................................................................................
+#....................................................................................................................
 
 #------------------------------------------------------FRONTEND------------------------------------------------------
+# Endpoints that fetch data that the frontend client (the middleware) requests in order to display in the html pages
+# Endpoints that make changes that the frontend client (the middleware) requests
+
 @app.route("/homepage")
-def front_homepage():
-    data = {"id": node_instance.id}
-    return data
+def front_homepage():                       # for the homepage we only need to fetch the ID of the node that is currently using the frontend interface
+    data = {"id": node_instance.id}         # return the data in the form of a dictionary
+    return data                         
 
 @app.route("/info")
-def front_info():
+def front_info():                           # for the team information page we only need to fetch the ID of the node that is currently using the frontend interface
     data = {"id": node_instance.id}
     return data
 
 @app.route("/transaction", methods = ['GET', 'POST'])
-def front_create_transaction():
+def front_create_transaction():             # for the transaction page we either create a transaction or simply fetch node ID for the page 
     return_data = {}
-    return_data["id"] = node_instance.id
+    return_data["id"] = node_instance.id    # ID of the node currently using the frontend interface (needed in both cases)
 
-    if request.method == 'POST':
+    if request.method == 'POST':            # POST METHOD triggered by the button "Create Transaction" after the input fields are filled
+                                            # returns the node ID (to display on the transaction page) and a suitable message depending on the success of the transaction
 
         req = request.get_json()
-        receiver_address = req["address"]
-        amount = req["amount"]
+        receiver_address = req["address"]   # get the receiver address from middleware's request
+        amount = req["amount"]              # get the amount of noobcash coins to send from middleware's request
 
+        # if the sender tries to send coins to itself don't try to create the transaction - return error message
         if (node_instance.wallet.address == receiver_address):
             return_data["message"] = "The sender address is the same as the receiver address. Please select a different receiver address."
             return return_data
-            
+
+        # try to create the transaction
         try:
             message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
-            if error_code!=200:
+            
+            if error_code!=200:             # if the transaction fails return error message    
                 msg = str(error_code) + " " + str(message)
                 return_data["message"] = msg
-            else:
-                threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+            else:                           # if the transaction succeeds send success message                         
+                threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()     # broadcast the created transaction to the other nodes
                 return_data["message"] = "The transaction was conducted successfully"
+            
             return return_data
         
+        # if the try fails return error message
         except:
             return_data["message"] = 'Error while creating transaction'
             return return_data
  
-    else:
-        return return_data
+    else:                                   # GET METHOD if we simply need to fetch the transaction page
+        return return_data                  # return only the node ID and not any message
 
 
 @app.route("/view")
-def front_view():
-    last_block = node_instance.view_transaction()
+def front_view():                           # for the view page fetch the node ID, the last valid block's info and the transactions contained in this block
+    last_block = node_instance.view_transaction()       # Node endpoint to get last valid block
     data = {}
     
-    if last_block == None:
-        data["none"] = True
+    if last_block == None:                  # if there is no valid block 
+        data["none"] = True                 # boolean that is True if there is no valid block  
         data["id"] = node_instance.id
-    else:
-        index = last_block["index"]
+    
+    else:                                   # else if there is a valid block in the current blockchain
+        index = last_block["index"]            
         hash = last_block["hash"]
         t = last_block["timestamp"]
+
         transactions_res = []
-        for trans in last_block["list_of_transactions"]:
+        for trans in last_block["list_of_transactions"]:    # list_of_transactions contained in the last valid block
+                                                            # each position of the list is a dictionary containing transaction info: id, amount, sender_id, receiver_id                                             
             dict = {}
 
             dict["id"] = trans["transaction_id"]
@@ -185,7 +184,7 @@ def front_view():
             sender_addr = trans["sender_address"]
             receiver_addr = trans["receiver_address"]
 
-            for node_ in node_instance.ring:
+            for node_ in node_instance.ring:                # get node ids from the ring using the node addresses that we took from the last valid block 
                 if node_['address'] == sender_addr:
                     dict["sender_id"] = node_['node_id']
                 if node_['address'] == receiver_addr:
@@ -200,63 +199,69 @@ def front_view():
             data["t"] = t
             data["transactions"] = transactions_res
         
-    return data
+    return data                             # data contains : boolean, node_id, block_index, block_hash, block_creationTime, list_of_transactions 
 
 @app.route("/balance")
-def front_balance():
-    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])
+def front_balance():                        # for the balance page fetch the the id of the node that is currently using the frontend interface and the balance in this node's wallet 
+    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])       # wallet endpoint to calculate current balance
     data = {}
     data["id"] = node_instance.id
     data["balance"] = curr_balance
-    return data
+    return data                             # return dictionary with node_ID and balance
 
 @app.route("/help")
-def front_help():     
+def front_help():                           # for the help page we only need to fetch the ID of the node that is currently using the frontend interface
     data = {"id": node_instance.id}
     return data
 
 #--------------------------------------------------------------------------------------------------------------------
 
 #---------------------------------------------------------CLI---------------------------------------------------------
+# Endpoints that fetch data that the cli client requests in order to display after a certain command
+# Endpoints that make changes that the cli client requests after a certain command
+
 @app.route("/cli_transaction", methods = ['POST'])
-def cli_create_transaction():
-    receiver_address = request.form.to_dict()['address']
+def cli_create_transaction():                               # create transaction after t command
+    receiver_address = request.form.to_dict()['address']    
     amount = int(request.form.to_dict()['amount'])
 
+    # if the sender tries to send coins to itself don't try to create the transaction - return error message
     if (node_instance.wallet.address == receiver_address):
         return "The sender id is the same as the receiver id. Please select a different receiver id."
 
+    # try to create the transaction
     try:
         message,error_code,trans=node_instance.create_transaction(binascii.b2a_hex(node_instance.wallet.public_key).decode('utf-8'),receiver_address,amount)
-        if error_code!=200:
+        if error_code!=200:                                 # if the transaction fails return error message
             msg = str(error_code) + " " + str(message)
             return msg
-        else:
-            threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()
+        else:                                               # else if the transaction succeeds send success message
+            threading.Thread(target=asyncio.run,args=(node_instance.broadcast_transaction(trans),)).start()     # broadcast the created transaction to the other nodes
             return "The transaction was conducted successfully"
     
+    # if the try fails return error message
     except:
         return "Error while creating transaction"
 
 @app.route("/cli_view", methods = ['GET'])
-def cli_view():
-    last_block = node_instance.view_transaction()
+def cli_view():                                             # fetch last valid block's transactions after view command
+    last_block = node_instance.view_transaction()           # Node endpoint to get last valid block
     
-    if last_block == None:
+    if last_block == None:                                  # if there is no valid block return error message
         return "There is no valid block in the blockchain yet"
-    else:
+    else:                                                   # else
         res = "\n"
         count = 1
-        for trans in last_block["list_of_transactions"]:
+        for trans in last_block["list_of_transactions"]:    # create response with all the transactions' contained in the last valid block
             transaction = (f"Transaction {count}")
             count += 1
             res = res + transaction + "\n\n" + str(trans) + "\n\n"
         return res
 
 @app.route("/cli_balance", methods = ['GET'])
-def cli_balance():
-    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])
-    return str(curr_balance)
+def cli_balance():                                          # fetch current node's wallet balance after balance command
+    curr_balance = node_instance.wallet.balance(node_instance.NBCs[node_instance.id])       # wallet endpoint to calculate current balance 
+    return str(curr_balance)                                
 
 #---------------------------------------------------------------------------------------------------------------------
 
@@ -560,7 +565,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
     parser.add_argument('-n', '--nodes', default=5, type=int, help='number of nodes in ring')
-    parser.add_argument('-a-', '--address', default='127.0.0.1', type=str, help='node address')
+    parser.add_argument('-a', '--address', default='127.0.0.1', type=str, help='node address')
 
     args = parser.parse_args()
     port = args.port

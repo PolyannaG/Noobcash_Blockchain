@@ -2,20 +2,19 @@
 <html>
 
 <style>
+
     * {
-  -webkit-box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+    }
 
     h3 {
         float: right;
         padding:0;
         margin:0;
         color: aliceblue;
-
         text-align: center;
-
         margin-left: 5%;
         margin-right: 5%;
         margin-bottom: 2%;
@@ -75,7 +74,6 @@
         margin:0;
         font-size: 25px;
         text-align: center;
-
         margin-left: 5%;
         margin-right: 5%;
         margin-bottom: 2%;
@@ -101,35 +99,23 @@
     </h3>
     
     <form action="{{ url_for('create_transaction_front', myid = data[0]) }}" method="post">
+
         <div class="input-wrap">
             <label class="input-label">Recipient Node's Address</label> <br>
             <input type="text" class="input-box-address" id="address" name="address" required>
-            
         </div>
         
         <div class="input-wrap">
             <label class="input-label">Amount to be sent</label> <br>
             <input type="number" step=1 min=0 class="input-box" id="amount" name="amount" required>
         </div>
+
         <div class="button" onClick="alert('Transaction pending...')">
             <input type="submit" class="input-button" value="Create Transaction">
         </div>
+
     </form>
 
-    <!--
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    <span>{{ message }}</span>
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                    </button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}

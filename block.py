@@ -1,11 +1,7 @@
-
 from Crypto.Hash import SHA
 import time
 import os
 from dotenv import load_dotenv
-
-
-
 
 class Block:
 	def __init__(self,index,previousHash,nonce,capacity=5):

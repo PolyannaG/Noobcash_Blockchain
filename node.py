@@ -1,11 +1,7 @@
-from ast import excepthandler
 from binascii import a2b_hex
 import binascii
 from cmath import e
-from platform import node
-from queue import Empty
 import random
-import sys
 from dotenv import load_dotenv
 from block import Block
 from wallet import wallet
@@ -13,14 +9,10 @@ from transaction import Transaction
 import requests
 import threading
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from time import sleep
 import time
 import os
 import uuid
 import copy
-import Crypto
-import Crypto.Random
 from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
@@ -694,9 +686,9 @@ class Node:
 				# process all new blocks and append them to chain:
 				for i in range(k,len(chain)):
 					
-					processed_block=self.process_block(chain[i])     # convert to object from dictionary
+					processed_block=self.process_block(chain[i])  	# convert to object from dictionary
 					
-					if i==0:                                         # genesis block, not validated. just update NBCs
+					if i==0:                                   		# genesis block, not validated. just update NBCs
 						for item in processed_block.listOfTransactions:
 							try:
 								self.update_nbcs(item,True)
@@ -710,8 +702,8 @@ class Node:
 								self.NBCs=copy.copy(old_NBCs)
 								self.resolve_conflicts(index)
 								return 
-					else:                                           # normal case, block must be validated
-						if not self.validate_block(processed_block,True):   # block not valid, this and all following will not be added to blockchain, start proccess of resolving conflict again
+					else:                               			# normal case, block must be validated
+						if not self.validate_block(processed_block,True):	# block not valid, this and all following will not be added to blockchain, start proccess of resolving conflict again
 							print('found block not valid in blockchain')
 							try:
 								self.locks['chain'].release()
@@ -726,9 +718,9 @@ class Node:
 							self.NBCs=copy.copy(old_NBCs)
 							self.resolve_conflicts(index)
 							return
-					self.chain.append(processed_block)           # block valid, append block to chain
+					self.chain.append(processed_block)           	# block valid, append block to chain
 
-					for trans in processed_block.listOfTransactions:    # remove transactions from pending, update used_nbcs etc.
+					for trans in processed_block.listOfTransactions: 		# remove transactions from pending, update used_nbcs etc.
 						if trans.transaction_id in self.pending_transaction_ids:
 
 							for input_ in trans.inputs:
@@ -765,7 +757,7 @@ class Node:
 		return
 
 
-	def process_transaction(self,item):                      # function to convert transaction from dictionary form to object
+	def process_transaction(self,item):                    	# function to convert transaction from dictionary form to object
 		try:
 			sender_address=item['sender_address']
 			receiver_address=item['receiver_address']
@@ -822,20 +814,20 @@ class Node:
 		except:
 			return None
 
-	def send_blockchain_resolve_conflict(self,index):               # function to send blockchain to node
+	def send_blockchain_resolve_conflict(self,index):              	# function to send blockchain to node
 		block_list=[]
 		self.locks['chain'].acquire()
-		for i in range(int(index),len(self.chain)):					 # create list of blocks in sendable form
+		for i in range(int(index),len(self.chain)):					# create list of blocks in sendable form
 			block_list.append(self.chain[i].to_dict(True))
 		self.locks['chain'].release()
 		return block_list
 
 
-	def view_transaction(self):
+	def view_transaction(self):						# function to get the last valid block of the current blockchain (for cli and frontend)						
 		my_chain = self.chain
-		if my_chain == []:
+		if my_chain == []:							# if the current blockchain is empty return None
 			return None
-		else:
-			last_valid_block = my_chain[-1]
-			res = last_valid_block.to_dict(True)
+		else:										# else
+			last_valid_block = my_chain[-1]			# get the last valid block of the blockchain
+			res = last_valid_block.to_dict(True)	
 			return res

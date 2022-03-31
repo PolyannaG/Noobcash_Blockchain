@@ -1,7 +1,3 @@
-from transaction import Transaction
-from block import Block
-
-
 class Blockchain():
     def __init__(self):
         self.transactions=[]                        # all validated transactions
@@ -16,7 +12,3 @@ class Blockchain():
 
     def add_transaction(self,transaction):
         self.transactions.append(transaction)
-
-
-
-
