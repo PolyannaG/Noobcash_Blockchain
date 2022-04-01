@@ -1,41 +1,50 @@
-
 from Crypto.Hash import SHA
 import time
-
-
-
+import os
+from dotenv import load_dotenv
 
 class Block:
-	def __init__(self,index,previousHash,nonce):
-		##set
-		self.index=index
-		self.previousHash=previousHash
-		self.timestamp=time.time()
-		self.hash=None
-		self.nonce=nonce
-		self.listOfTransactions=[]
+	def __init__(self,index,previousHash,nonce,capacity=5):
+		load_dotenv()                       # load environment variables
+		self.index=index                    # block's index in blockchain
+		self.previousHash=previousHash      # previous block's in blockchain hash
+		self.timestamp=time.time()          # time of creation
+		self.hash=None						# block hash
+		self.nonce=nonce                    # block's nonce number
+		self.listOfTransactions=[]          # transactions of the block
+		self.capacity=capacity              # max number of transactions the block can have
+		self.difficulty=int(os.getenv('DIFFICULTY'))   # blockchain's difficulty (number of zeros in the beginning)
 		
 	
-	def to_dict(self):
-		"""
-        Convert block info to dictionary
-        """
-		block_dict=({'previous_hash' : self.previousHash,
-					'index' : self.index,
-					'timestamp' : self.timestamp,
-					'list_of_transactions' : self.listOfTransactions,
-					'nonce' : self.nonce})
+	def to_dict(self,add_hash=False):       # function to convert block to dictionary from object
+		if not add_hash:				    # do not add the block hash in the dictionary
+			transactions=[]
+			for i in range(0, len(self.listOfTransactions)):
+				transactions.append(self.listOfTransactions[i].to_dict(True))
+			block_dict=({'previous_hash' : self.previousHash,
+						'index' : self.index,
+						'timestamp' : self.timestamp,
+						'list_of_transactions' : transactions,
+						'nonce' : self.nonce,
+						})
+		else:                              # add the block hash
+			transactions=[]
+			for i in range(0, len(self.listOfTransactions)):
+				transactions.append(self.listOfTransactions[i].to_dict(True))
+			block_dict=({'previous_hash' : self.previousHash,
+						'index' : self.index,
+						'timestamp' : self.timestamp,
+						'list_of_transactions' : transactions,
+						'nonce' : self.nonce,
+						'hash': self.hash,
+						'capacity': self.capacity
+						})
 		return block_dict
 
 
-	def myHash(self):
-		#calculate self.hash
-		value_to_hash=self.to_dict()
+	def myHash(self):                    # function to calculate block's hash
+		value_to_hash=str(self.to_dict())
 		self.hash=SHA.new(value_to_hash.encode('utf-8'))
-		
-
-
-	# def add_transaction(self, transaction, blockchain):
-	# 	#add a transaction to the block
-	# 	self.listofTransactions.append(transaction)
+		self.hash=self.hash.hexdigest()
+		return self.hash
 		

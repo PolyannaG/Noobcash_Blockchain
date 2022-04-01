@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+
+<style>
+
+    h3 {
+        float: right;
+        padding:0;
+        margin:0;
+        color: aliceblue;
+        text-align: center;
+        margin-left: 5%;
+        margin-right: 5%;
+        width: 70%;
+        height: 20%;
+    }
+
+</style>
+
+<body style="background-image: url(/static/images/background.jpg); background-repeat: no-repeat; background-size: cover;">
+
+    {% include 'topnav.html' %}
+    {% include 'navbar.html' %}
+
+    <h3 style="margin-top: 80px;">
+        The last transactions that have been conducted are displayed below. 
+    </h3>
+
+    <h3>
+        More specifically, these transactions are the ones contained in the last valid block of the current blockchain.
+    </h3>
+    
+    <h3 style=" color: rgb(192, 4, 4);; margin-top: 4%; font-size: 25px">
+        There is no valid block in the blockchain yet
+    </h3>
+
+</body>
+</html>

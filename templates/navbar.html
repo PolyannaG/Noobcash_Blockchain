@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+
+<style>
+
+    /* List style */
+    ul {
+        list-style-type: none;
+        background-color: rgba(39, 165, 159, 0.349);
+        padding:0;
+        margin: 0;
+        margin-left: 5%;
+        position: relative;
+        float: left;
+        width: 15%;
+        height: 90%;
+        background:rgba(255,255,255,0.5);
+    }
+
+    /* Items in the list style */
+    li a {
+        display: block;
+        color: #000;
+        padding: 8px 16px;
+        text-decoration: none;
+        text-align: center;
+        font-size: 25px;
+        float:top;
+    }
+
+    /* Change the link color on hover */
+    li a:hover {
+        background-color: rgb(1, 107, 137);
+        color: black;
+    }
+
+    li a:active {
+        background-color: rgb(0,64,85);
+        color: white;
+    }
+
+</style>
+
+<body style="background-color: rgba(39, 165, 159, 0.349); margin-top: 80px;">
+
+    <ul style="margin-top: 80px;">
+        <li>
+            <a  class="active" href="{{ url_for('homepage', myid = data[0]) }}">
+                Home
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('create_transaction_front', myid = data[0]) }}">
+                New Transaction
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('view', myid = data[0]) }}">
+                View
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('balance', myid = data[0]) }}">
+                Balance
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('help', myid = data[0]) }}">
+                Help
+            </a>
+        </li>
+    </ul>
+
+</body>
+</html>
