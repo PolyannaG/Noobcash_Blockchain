@@ -110,7 +110,7 @@ After starting the UI app, the UI corresponding to each node can be accessed sep
 ```
 http://<IP>:<MiddlewarePort>/homepage/nodeID/<X>
 ```
-where `<IP>` is the address the UI app is running on, and `<X>` is the node ID whose UI one wished to access.
+where `<IP>` is the address the UI app is running on, and `<X>` is the node ID whose UI one wishes to access.
 
 Example usage:
 ```
