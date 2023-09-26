@@ -298,7 +298,13 @@ def second():
 
 @app.route('/file_transactions', methods=['GET'])          # when called, the node reads the transactions of the file transactions{node id}.txt
 def read_file_trans():
-    file1 = open('./5nodes/transactions{}.txt'.format(node_instance.id), 'r')
+    try:
+        filedirectory = request.args.get("file_directory")
+        file1 = open(
+            './{}/transactions{}.txt'.format(filedirectory, node_instance.id), 'r')
+    except:
+        return {'message': 'Error reading transaction file. Check specified file_directory'}, 404
+
     count = 0
     
     while True:
