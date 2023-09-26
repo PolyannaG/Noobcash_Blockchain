@@ -10,10 +10,14 @@ import click
 @click.option(
     "--port", required=True, type=int, help="The port that our application listens to"
 )
+@click.option(
+    "--address", required=True, type=str, help="The address our application listens to"
+)
 @click.pass_context
-def cli(ctx, port):
+def cli(ctx, address, port):
     ctx.ensure_object(dict)
     ctx.obj["port"] = port
+    ctx.obj["address"] = address
 
 
 # All custom commands follow the same logic
@@ -35,9 +39,11 @@ def cli(ctx, port):
 @click.pass_obj
 def t(ctx, recipient_address, amount):
     port = ctx["port"]  # get port option from group to build the url
-    my_ip = socket.gethostbyname(
-        socket.gethostname()
-    )  # get current machine's IP to build the url
+    # my_ip = socket.gethostbyname(
+    #     socket.gethostname()
+    # )
+    # get current machine's IP to build the url
+    my_ip = ctx["address"]
     url = (
         "http://" + str(my_ip) + ":" + str(port) + "/cli_transaction"
     )  # build correct url to access the corresponding endpoint to the correct REST API
@@ -55,7 +61,8 @@ def t(ctx, recipient_address, amount):
 @click.pass_obj
 def view(ctx):
     port = ctx["port"]
-    my_ip = socket.gethostbyname(socket.gethostname())
+    # my_ip = socket.gethostbyname(socket.gethostname())
+    my_ip = ctx["address"]
     url = "http://" + str(my_ip) + ":" + str(port) + "/cli_view"
     req = requests.get(url)
     click.echo(req.text)
@@ -65,7 +72,8 @@ def view(ctx):
 @click.pass_obj
 def balance(ctx):
     port = ctx["port"]
-    my_ip = socket.gethostbyname(socket.gethostname())
+    # my_ip = socket.gethostbyname(socket.gethostname())
+    my_ip = ctx["address"]
     url = "http://" + str(my_ip) + ":" + str(port) + "/cli_balance"
     req = requests.get(url)
     click.echo(req.text)

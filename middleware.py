@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, flash, request
 from flask_cors import CORS
 import socket
@@ -13,9 +14,11 @@ app.secret_key = b'_noobcash5#y2L"F2Blockchain9Q8z\n\xec]/'  # set app secret ke
 
 
 def get_contact(id):  # function to get the address of a node, given its ID
-    my_ip = socket.gethostbyname(
-        socket.gethostname()
-    )  # get IP address for the current machine to build correct url
+    # my_ip = socket.gethostbyname(
+    #     socket.gethostname()
+    # )
+    # get IP address for the current machine to build correct url
+    my_ip = os.environ.get("NODEADDRESS")
     ring_url = "http://" + str(my_ip) + ":5000/ring/print"
     ring = json.loads((requests.get(ring_url)).text)  # get the ring
     address = None

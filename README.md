@@ -75,8 +75,48 @@ http://localhost:<port_number>/blockchain/print
 
 ## Using the CLI
 
-Documentation to be added shortly.
+The CLI can be run for each of the nodes through th command:
+```
+python cli.py --port <X> --address <Y> <command>
+```
+whereby <X> is the port number and <Y> is the IP address the noobcash app is running on for the specific node.
 
-## Using the user inteface
+The folllowing commands are available:
+* `view` :
+    Allows user to see the transactions included in the last block of the blockchain.
+* `balance` :
+    Allows user to see the current node's balance.
+* `t --recipient_address <address> --amount <amount of coins>` :
+    Can be used to create a transaction, in order to send `<amount of coins>` to the node with address `<address>`,  from the current node. (The node addresses can be recovered from the blockchain using `view` command for testing purposes).
 
-Documentation to be added shortly.
+For each command the `--help` parameter is also available to provide related documentation.
+
+Example usages:
+```
+python cli.py --port 5001 --address "127.0.0.1" balance
+python cli.py --port 5001 --address "127.0.0.1" view
+python cli.py --port 5001 --address "127.0.0.1" t  --amount 2 --recipient_address "2d2d2d2d2d424547494e205055424c4943204b45592d2d2d2d2d0a4d494942496a414e42676b71686b6947397730424151454641414f43415138414d49494243674b434151454136623079636e49596c58513950486842345a4b580a6e77587430594f76665344506d5048734246736f79584e61556d4e73426f5763797641376c32484253544f3345645137367a62306b7a765a2f49345861576f790a337a563732557145413664317078393478676b4f4d4550584e7a58687138777a6670617a58307761386a5835627a695a4f6574726f436d47376f5948747243710a585748356f5a6e5073757a62694159556a4e63584e4b34546c71694d4264716431354a47334e65506151525165734137703056787766796e5a505a4d76426e6a0a32416551333071646f4e38354c356557572b59774746303647786a3131323465475a387a784442563267326435664757736146416750655637476854727541310a6d76483953736f504c45447178653930797979426266326167644a664f6a6c506156476275504b56366474445172735259332f2f325661715765734c717472460a53514944415141420a2d2d2d2d2d454e44205055424c4943204b45592d2d2d2d2d"
+python cli.py --port 5001 --address "127.0.0.1" view --help
+```
+## Using the User Interface
+
+The user inteface (UI) app can be run using:
+```
+python middleware.py --port <MiddlewarePort>
+```
+where `<MiddlewarePort>` is the desired port number for the UI app to be run (default: `4000`).
+
+After starting the UI app, the UI corresponding to each node can be accessed separately through:
+```
+http://<IP>:<MiddlewarePort>/homepage/nodeID/<X>
+```
+where `<IP>` is the address the UI app is running on, and `<X>` is the node ID whose UI one wished to access.
+
+Example usage:
+```
+http://127.0.0.1:4001/homepage/nodeID/1
+```
+
+Through the UI, one can perform transactions, view the last conducted transaction, view the node's wallet's balance and read some general information about the UI's offered functionalities.
+
+***Note*** The address at which the UI app can access the running nodes is specified as an environment variable named `NODEADDRESS` and is currently set to `localhost`. It can be changed directly from the `.env` file.
